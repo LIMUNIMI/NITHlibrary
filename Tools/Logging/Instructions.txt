@@ -1,0 +1,44 @@
+﻿WITH THIS PROCEDURE, YOU WILL OBTAIN ERROR LOGGING THROUGH A MESSAGEBOX AND A TRACE FILE IN THE "LOGS" FOLDER IN YOUR APPLICATION, PRIOR CRASHING.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Add this to App.xaml, as a property of <Application>:
+=====================================================
+
+DispatcherUnhandledException="App_OnDispatcherUnhandledException"
+
+
+This function to App.xaml.cs:
+=============================
+
+private void App_OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            string exceptionMessageText =
+                $"An exception occurred: {e.Exception.Message}\r\n\r\nat: {e.Exception.StackTrace}";
+            LoggingService.Log(e.Exception);
+            // Create a Window to display the exception information.
+            MessageBox.Show(exceptionMessageText, "Unhandled Exception", MessageBoxButton.OK);
+        }
+
+
+These two "using" to the same class:
+====================================
+
+using NITHlibrary.ErrorLogging;
+using System.Windows.Threading;
+
+
+And this call to the Main Window's constructor, under InitializeComponent():
+============================================================================
+
+TraceAdder.AddTrace();
+
+
+Plus this "using" to the same class:
+====================================
+
+using NITHlibrary.ErrorLogging;
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+You can test it by throwing a random "throw new Exception("Test")" at some point in your code (e.g. after a button press)
