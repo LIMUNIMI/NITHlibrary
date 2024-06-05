@@ -1,8 +1,9 @@
 # NITHlibrary
+
 A C# library for interfacing NITH sensor peripherals and wrappers
 
-<p align="center">
-  <img src="NithLogo.png" alt="NITH Logo" width="200" height="200">
-</p>
+<div align="center">
+  <img src="NithLogo_Black_Trace.png" alt="NITH logo." width="150px"/>
+</div>
 
 Readme coming soon!
