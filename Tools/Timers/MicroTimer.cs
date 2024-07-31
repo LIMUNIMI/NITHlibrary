@@ -1,18 +1,8 @@
-﻿/*
- * Project source: https://www.codeproject.com/Articles/98346/Microsecond-and-Millisecond-NET-Timer
- * Modified to fit Threading requirements from .NET 8
- */
-
-
-/*
- * Project source: https://www.codeproject.com/Articles/98346/Microsecond-and-Millisecond-NET-Timer
- * Modified to fit Threading requirements from .NET 8
- */
-
-namespace NITHlibrary.Tools.Timers
+﻿namespace NITHlibrary.Tools.Timers
 {
     /// <summary>
-    /// MicroTimer class
+    /// Represents a high-precision timer that executes a task at defined intervals measured in microseconds.
+    /// Inspired by the MicroTimer library (https://www.codeproject.com/Articles/98346/Microsecond-and-Millisecond-NET-Timer).
     /// </summary>
     public class MicroTimer
     {
@@ -21,18 +11,36 @@ namespace NITHlibrary.Tools.Timers
         private Thread? _threadTimer = null;
         private long _timerIntervalInMicroSec = 0;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MicroTimer"/> class.
+        /// </summary>
         public MicroTimer()
         { }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MicroTimer"/> class with a specified interval.
+        /// </summary>
+        /// <param name="timerIntervalInMicroseconds">The interval in microseconds between timer events.</param>
         public MicroTimer(long timerIntervalInMicroseconds)
         {
             Interval = timerIntervalInMicroseconds;
         }
 
+        /// <summary>
+        /// Represents the method that handles the <see cref="MicroTimerElapsed"/> event.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="timerEventArgs">An object that contains the event data.</param>
         public delegate void MicroTimerElapsedEventHandler(object sender, MicroTimerEventArgs timerEventArgs);
 
+        /// <summary>
+        /// Occurs when the timer interval has elapsed.
+        /// </summary>
         public event EventHandler<MicroTimerEventArgs> MicroTimerElapsed;
 
+        /// <summary>
+        /// Gets or sets a value indicating whether the timer is running.
+        /// </summary>
         public bool Enabled
         {
             set
@@ -46,24 +54,30 @@ namespace NITHlibrary.Tools.Timers
                     Stop();
                 }
             }
-            get
-            {
-                return _threadTimer != null && _threadTimer.IsAlive;
-            }
+            get => _threadTimer != null && _threadTimer.IsAlive;
         }
 
+        /// <summary>
+        /// Gets or sets the amount of time to ignore an event if it's late by this amount of time.
+        /// </summary>
         public long IgnoreEventIfLateBy
         {
-            get { return Interlocked.Read(ref _ignoreEventIfLateBy); }
-            set { Interlocked.Exchange(ref _ignoreEventIfLateBy, value <= 0 ? long.MaxValue : value); }
+            get => Interlocked.Read(ref _ignoreEventIfLateBy);
+            set => Interlocked.Exchange(ref _ignoreEventIfLateBy, value <= 0 ? long.MaxValue : value);
         }
 
+        /// <summary>
+        /// Gets or sets the interval between timer events in microseconds.
+        /// </summary>
         public long Interval
         {
-            get { return Interlocked.Read(ref _timerIntervalInMicroSec); }
-            set { Interlocked.Exchange(ref _timerIntervalInMicroSec, value); }
+            get => Interlocked.Read(ref _timerIntervalInMicroSec);
+            set => Interlocked.Exchange(ref _timerIntervalInMicroSec, value);
         }
 
+        /// <summary>
+        /// Aborts the timer, stopping its thread and disposing of resources.
+        /// </summary>
         private void Abort()
         {
             if (_cancellationTokenSource != null)
@@ -80,6 +94,9 @@ namespace NITHlibrary.Tools.Timers
             }
         }
 
+        /// <summary>
+        /// Starts the timer.
+        /// </summary>
         public void Start()
         {
             if (Enabled || Interval <= 0)
@@ -87,50 +104,67 @@ namespace NITHlibrary.Tools.Timers
                 return;
             }
 
-            _cancellationTokenSource = new CancellationTokenSource();
+            _cancellationTokenSource = new();
 
             ThreadStart threadStart = delegate ()
             {
                 NotificationTimer(ref _timerIntervalInMicroSec, ref _ignoreEventIfLateBy, _cancellationTokenSource.Token);
             };
 
-            _threadTimer = new Thread(threadStart)
+            _threadTimer = new(threadStart)
             {
                 Priority = ThreadPriority.Highest
             };
             _threadTimer.Start();
         }
 
+        /// <summary>
+        /// Stops the timer.
+        /// </summary>
         public void Stop()
         {
             Abort();
         }
 
+        /// <summary>
+        /// Stops the timer and waits indefinitely for it to stop.
+        /// </summary>
         public void StopAndWait()
         {
             StopAndWait(Timeout.Infinite);
         }
 
+        /// <summary>
+        /// Stops the timer and waits for the specified amount of time for it to stop.
+        /// </summary>
+        /// <param name="timeoutInMilliSec">The amount of time in milliseconds to wait for the timer to stop.</param>
+        /// <returns>True if the timer thread has stopped; otherwise, false.</returns>
         public bool StopAndWait(int timeoutInMilliSec)
         {
             Abort();
             return !_threadTimer.IsAlive;
         }
 
+        /// <summary>
+        /// Handles the notification logic for the timer.
+        /// </summary>
+        /// <param name="timerIntervalInMicroSec">The interval in microseconds between timer events.</param>
+        /// <param name="ignoreEventIfLateBy">The amount of time to ignore an event if it's late by this amount of time.</param>
+        /// <param name="token">The cancellation token used to stop the timer.</param>
         private void NotificationTimer(ref long timerIntervalInMicroSec, ref long ignoreEventIfLateBy, CancellationToken token)
         {
-            int timerCount = 0;
+            var timerCount = 0;
             long nextNotification = 0;
 
-            MicroStopwatch microStopwatch = new MicroStopwatch();
+            MicroStopwatch microStopwatch = new();
             microStopwatch.Start();
 
             while (!token.IsCancellationRequested)
             {
-                long callbackFunctionExecutionTime = microStopwatch.ElapsedMicroseconds - nextNotification;
+                var callbackFunctionExecutionTime = microStopwatch.ElapsedMicroseconds - nextNotification;
 
-                long timerIntervalInMicroSecCurrent = Interlocked.Read(ref timerIntervalInMicroSec);
-                long ignoreEventIfLateByCurrent = Interlocked.Read(ref ignoreEventIfLateBy);
+                var timerIntervalInMicroSecCurrent = Interlocked.Read(ref timerIntervalInMicroSec);
+                var ignoreEventIfLateByCurrent = Interlocked.Read(ref ignoreEventIfLateBy);
 
                 nextNotification += timerIntervalInMicroSecCurrent;
                 timerCount++;
@@ -143,14 +177,14 @@ namespace NITHlibrary.Tools.Timers
 
                 if (token.IsCancellationRequested) break;
 
-                long timerLateBy = elapsedMicroseconds - nextNotification;
+                var timerLateBy = elapsedMicroseconds - nextNotification;
 
                 if (timerLateBy >= ignoreEventIfLateByCurrent)
                 {
                     continue;
                 }
 
-                MicroTimerEventArgs microTimerEventArgs = new MicroTimerEventArgs(timerCount, elapsedMicroseconds, timerLateBy, callbackFunctionExecutionTime);
+                MicroTimerEventArgs microTimerEventArgs = new(timerCount, elapsedMicroseconds, timerLateBy, callbackFunctionExecutionTime);
                 MicroTimerElapsed?.Invoke(this, microTimerEventArgs);
             }
 

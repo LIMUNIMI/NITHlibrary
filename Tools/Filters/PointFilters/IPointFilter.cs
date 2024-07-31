@@ -3,7 +3,7 @@
 namespace NITHlibrary.Tools.Filters.PointFilters
 {
     /// <summary>
-    /// An interface for a generic black-box point based filter.
+    /// An interface for a generic point filter.
     /// </summary>
     public interface IPointFilter
     {

@@ -1,14 +1,25 @@
 ﻿namespace NITHlibrary.Tools.Timers
 {
     /// <summary>
-    /// MicroTimer Event Argument class
+    /// Represents the event arguments for the MicroTimer event.
+    /// Provides information about the timer event such as the timer count, 
+    /// elapsed time, timer delay, and execution time of the callback function.
+    /// Inspired by the MicroTimer library (https://www.codeproject.com/Articles/98346/Microsecond-and-Millisecond-NET-Timer).
     /// </summary>
     public class MicroTimerEventArgs : EventArgs
     {
-        public MicroTimerEventArgs(int timerCount,
-                                           long elapsedMicroseconds,
-                                           long timerLateBy,
-                                           long callbackFunctionExecutionTime)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MicroTimerEventArgs"/> class.
+        /// </summary>
+        /// <param name="timerCount">The number of times the timed event (callback function) has executed.</param>
+        /// <param name="elapsedMicroseconds">The time in microseconds since the timer started when the timed event was called.</param>
+        /// <param name="timerLateBy">How late the timer was compared to when it should have been called.</param>
+        /// <param name="callbackFunctionExecutionTime">The time it took to execute the previous call to the callback function (OnTimedEvent).</param>
+        public MicroTimerEventArgs(
+            int timerCount,
+            long elapsedMicroseconds,
+            long timerLateBy,
+            long callbackFunctionExecutionTime)
         {
             TimerCount = timerCount;
             ElapsedMicroseconds = elapsedMicroseconds;
@@ -16,16 +27,24 @@
             CallbackFunctionExecutionTime = callbackFunctionExecutionTime;
         }
 
-        // Time it took to execute previous call to callback function (OnTimedEvent)
+        /// <summary>
+        /// Gets the time it took to execute the previous call to the callback function (OnTimedEvent).
+        /// </summary>
         public long CallbackFunctionExecutionTime { get; }
 
-        // Time when timed event was called since timer started
+        /// <summary>
+        /// Gets the time in microseconds since the timer started when the timed event was called.
+        /// </summary>
         public long ElapsedMicroseconds { get; }
 
-        // Simple counter, number times timed event (callback function) executed
+        /// <summary>
+        /// Gets the number of times the timed event (callback function) has executed.
+        /// </summary>
         public int TimerCount { get; }
 
-        // How late the timer was compared to when it should have been called
+        /// <summary>
+        /// Gets how late the timer was compared to when it should have been called.
+        /// </summary>
         public long TimerLateBy { get; }
     }
 }

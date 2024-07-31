@@ -5,45 +5,57 @@ using NITHlibrary.Tools.Filters.ValueFilters;
 namespace NITHlibrary.Nith.Preprocessors
 {
     /// <summary>
-    /// A preprocessor which applies a specific filter to each of the specified params
+    /// A preprocessor which applies a moving average exponential decaying filter 
+    /// to each of the specified NITH parameters.
     /// </summary>
-    public class NithPreprocessor_MAFilterParams : INithPreprocessor
+    public class NithPreprocessor_MAfilterParams : INithPreprocessor
     {
-        private List<DoubleFilterMAExpDecaying> filtersArray;
-        private List<NithParameters> paramsArray;
+        private readonly List<DoubleFilterMAexpDecaying> _filtersArray;
+        private readonly List<NithParameters> _paramsArray;
 
-        public NithPreprocessor_MAFilterParams(List<NithParameters> paramsArray, float filterAlpha)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NithPreprocessor_MAfilterParams"/> class.
+        /// </summary>
+        /// <param name="paramsArray">List of parameters to be filtered.</param>
+        /// <param name="filterAlpha">Alpha value for the exponential decaying filter.</param>
+        public NithPreprocessor_MAfilterParams(List<NithParameters> paramsArray, float filterAlpha)
         {
-            this.paramsArray = paramsArray;
-            filtersArray = new List<DoubleFilterMAExpDecaying>();
+            this._paramsArray = paramsArray;
+            _filtersArray = [];
 
             foreach (var argument in paramsArray)
             {
-                filtersArray.Add(new DoubleFilterMAExpDecaying(filterAlpha));
+                _filtersArray.Add(new(filterAlpha));
             }
         }
 
+        /// <summary>
+        /// Transforms the given sensor data by applying the filter to each specified parameter.
+        /// This method will typically be called automatically by the <see cref="NithModule"/> class."/>
+        /// </summary>
+        /// <param name="sensorData">The sensor data to be transformed.</param>
+        /// <returns>The transformed sensor data with filtered parameters.</returns>
         public NithSensorData TransformData(NithSensorData sensorData)
         {
-            for (int i = 0; i < paramsArray.Count; i++)
+            for (var i = 0; i < _paramsArray.Count; i++)
             {
-                NithParameters param = paramsArray[i];
+                var param = _paramsArray[i];
                 if (sensorData.ContainsParameter(param))
                 {
                     // Getting value and removing from data
-                    NithArgumentValue backup = sensorData.GetParameter(param).Value;
-                    sensorData.Values.Remove(sensorData.Values.Find(x => x.Argument == param));
-                    double baseVal = backup.Base_AsDouble;
+                    var backup = sensorData.GetParameterValue(param).Value;
+                    sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == param));
+                    var baseVal = backup.BaseAsDouble;
 
                     // Filtering
-                    filtersArray[i].Push(baseVal);
-                    double filteredBaseVal = filtersArray[i].Pull();
+                    _filtersArray[i].Push(baseVal);
+                    var filteredBaseVal = _filtersArray[i].Pull();
 
                     // Making the new value
-                    sensorData.Values.Add(new NithArgumentValue
+                    sensorData.Values.Add(new()
                     {
                         Type = backup.Type,
-                        Argument = param,
+                        Parameter = param,
                         Base = filteredBaseVal.ToString("F5"),
                         Max = backup.Max
                     });

@@ -1,166 +1,202 @@
-﻿using System.Globalization;
-using NITHlibrary.Nith.Internals;
+﻿using NITHlibrary.Nith.Internals;
 using NITHlibrary.Nith.Module;
+using NITHlibrary.Nith.Preprocessors;
 using NITHlibrary.Tools.Mappers;
+using System.Globalization;
 
 namespace NITHlibrary.Nith.Wrappers.NithFaceCam
 {
     /// <summary>
-    /// A wrapper for NithFaceCam software sensor.
-    ///
-    /// It is able to handle NithData, and turn the values into more convenient and manageable stuff, including:
-    /// - Blinking (boolean) for both eyes independently and together
-    /// - Mouth opened/closed (boolean)
-    /// - Eye aperture (continuous value), with a maximum, discarding the minimum
-    ///
-    /// Moreover, it can be used to calibrate eyes and mouth aperture for the specific user, taking into account their maximum aperture and minimum aperture.
+    /// Preprocessor for NITHwebcamWrapper.
+    /// Does the following:
+    /// - Eyes and mouth aperture calibration (taking into account the user's maximum and minimum aperture). Eyes and mouth aperture values will then be from 0 to 1 (and the Normalized value will become available)
+    /// - Extracting the boolean values for mouth and eyes aperture (which simply state if the aperture is above a certain threshold)
     /// </summary>
     public class NithPreprocessor_FaceCam : INithPreprocessor
     {
-        // Double threshold for eye blinks?
-        public bool DoubleThreshBlinks { get; set; }
-
         // Deadzone percentages
-        private const float DEADZONE_PERC_LE = 0.2f;
-        private const float DEADZONE_PERC_MOU = 0.3f;
-        private const float DEADZONE_PERC_RE = 0.2f;
+        private const float DeadzonePercLe = 0.2f;
+
+        private const float DeadzonePercMou = 0.4f;
+
+        private const float DeadzonePercRe = 0.2f;
 
         // Define the percentage of opening required to consider something open (eyes and mouth)
-        private const float OPENINGPERCENTAGE_LE = 0.25f;
-        private const float OPENINGPERCENTAGE_MOU = 0.10f;
-        private const float OPENINGPERCENTAGE_RE = 0.25f;
+        private const float OpeningpercentageLe = 0.18f;
+
+        private const float OpeningpercentageMou = 0.25f;
+
+        private const float OpeningpercentageRe = 0.18f;
 
         // Domain mapper to turn values in the 0/100 range
-        private readonly SegmentMapper mapperLE;
-        private readonly SegmentMapper mapperMOU;
-        private readonly SegmentMapper mapperRE;
+        private readonly SegmentMapper _mapperLe;
+
+        private readonly SegmentMapper _mapperMou;
+
+        private readonly SegmentMapper _mapperRe;
 
         // Required arguments for this preprocessor to intervene
-        private readonly List<NithParameters> requiredArguments = new List<NithParameters>()
-        {
+        private readonly List<NithParameters> _requiredArguments =
+        [
             NithParameters.eyeLeft_ape,
             NithParameters.eyeRight_ape,
             NithParameters.mouth_ape
-        };
+        ];
+
+        private readonly List<string> _requiredSensorName = ["NITHfaceCam"];
 
         // Required sensor name ofr this preprocessor to intervene
+        private float _apertureLe = 0;
 
-        private readonly List<string> requiredSensorName = new List<string>()
-        {
-            "NITHfaceCam"
-        };
+        private float _apertureMou = 0;
 
-        private float aperture_LE = 0;
-        private float aperture_MOU = 0;
-        private float aperture_RE = 0;
+        private float _apertureRe = 0;
 
         // Deadzones for max/min (both upper and lower)
-        private float deadzone_LE = 0;
-        private float deadzone_MOU = 0;
-        private float deadzone_RE = 0;
+        private float _deadzoneLe = 0;
 
-        private bool isOpen_LE = false;
-        private bool isOpen_MOU = false;
-        private bool isOpen_RE = false;
+        private float _deadzoneMou = 0;
 
-        private float MAX_val_LE = float.NegativeInfinity;
-        private float MAX_val_MOU = float.NegativeInfinity;
-        private float MAX_val_RE = float.NegativeInfinity;
-        private float MIN_val_LE = float.PositiveInfinity;
-        private float MIN_val_MOU = float.PositiveInfinity;
-        private float MIN_val_RE = float.PositiveInfinity;
+        private float _deadzoneRe = 0;
 
-        private float threshold_LE = 0;
-        private float threshold_MOU = 0;
-        private float threshold_RE = 0;
+        private bool _isCalibratingClosed = false;
 
-        private bool isCalibratingOpen = false;
-        private bool isCalibratingClosed = false;
+        private bool _isCalibratingOpen = false;
 
-        public void Calibrate_Open()
-        {
-            isCalibratingOpen = true;
-        }
-        public void Calibrate_Closed()
-        {
-            isCalibratingClosed = true;
-        }
+        private bool _isOpenLe = false;
 
-        public NithPreprocessor_FaceCam(NithFaceCamCalibrationModes calibrationMode = NithFaceCamCalibrationModes.Automatic_continuous, bool doubleThreshBlinks = true)
+        private bool _isOpenMou = false;
+
+        private bool _isOpenRe = false;
+
+        private float _maxValLe = float.NegativeInfinity;
+
+        private float _maxValMou = float.NegativeInfinity;
+
+        private float _maxValRe = float.NegativeInfinity;
+
+        private float _minValLe = float.PositiveInfinity;
+
+        private float _minValMou = float.PositiveInfinity;
+
+        private float _minValRe = float.PositiveInfinity;
+
+        private float _thresholdLe = 0;
+
+        private float _thresholdMou = 0;
+
+        private float _thresholdRe = 0;
+
+        /// <summary>
+        /// Creates a new instance of the <see cref="NithPreprocessor_FaceCam"/> class.
+        /// </summary>
+        /// <param name="calibrationMode">Specifies how the calibration will be performed.</param>
+        /// <param name="doubleThreshBlinks">Should a double threshold be applied for blink detection? (Usually more robust)</param>
+        public NithPreprocessor_FaceCam(NithFaceCamCalibrationModes calibrationMode = NithFaceCamCalibrationModes.AutomaticContinuous, bool doubleThreshBlinks = true)
         {
             CalibrationMode = calibrationMode;
-            mapperLE = new SegmentMapper(0, 100, 0, 100, true);
-            mapperRE = new SegmentMapper(0, 100, 0, 100, true);
-            mapperMOU = new SegmentMapper(0, 100, 0, 100, true);
+            _mapperLe = new(0, 100, 0, 100, true);
+            _mapperRe = new(0, 100, 0, 100, true);
+            _mapperMou = new(0, 100, 0, 100, true);
             DoubleThreshBlinks = doubleThreshBlinks;
         }
 
+        /// <summary>
+        /// Specifies the calibration mode.
+        /// </summary>
         public NithFaceCamCalibrationModes CalibrationMode { get; set; }
 
+        /// <summary>
+        /// Specifies if a double threshold should be applied for the detecton of eye blinks (usually more robust).
+        /// </summary>
+        public bool DoubleThreshBlinks { get; set; }
+
+        /// <summary>
+        /// If <see cref="NithFaceCamCalibrationModes.Manual"/> is set, this method should be called to calibrate the closed state. To do this, the user should close both eyes and mouth.
+        /// </summary>
+        public void Calibrate_Closed()
+        {
+            _isCalibratingClosed = true;
+        }
+
+        /// <summary>
+        /// If <see cref="NithFaceCamCalibrationModes.Manual"/> is set, this method should be called to calibrate the open state. To do this, the user should open both eyes and mouth.
+        /// </summary>
+        public void Calibrate_Open()
+        {
+            _isCalibratingOpen = true;
+        }
+
+        /// <summary>
+        /// Applies the transformations to the data. This method will be typically called by the associated <see cref="NithModule"/>.
+        /// </summary>
+        /// <param name="sensorData">Incoming sensor data.</param>
+        /// <returns>Transformed sensor data.</returns>
         NithSensorData INithPreprocessor.TransformData(NithSensorData sensorData)
         {
-            if (sensorData.ContainsParameters(requiredArguments) && requiredSensorName.Contains(sensorData.SensorName)) // Check for arguments presence and correct sensor name
+            if (sensorData.ContainsParameters(_requiredArguments) && _requiredSensorName.Contains(sensorData.SensorName)) // Check for arguments presence and correct sensor name
             {
-
                 // Retrieve arguments as double
-                float val_LE = (float)sensorData.GetParameter(NithParameters.eyeLeft_ape).Value.Base_AsDouble;
-                float val_RE = (float)sensorData.GetParameter(NithParameters.eyeRight_ape).Value.Base_AsDouble;
-                float val_MOU = (float)sensorData.GetParameter(NithParameters.mouth_ape).Value.Base_AsDouble; // TODO questa è a zero. Embé?
+                var valLe = (float)sensorData.GetParameterValue(NithParameters.eyeLeft_ape).Value.BaseAsDouble;
+                var valRe = (float)sensorData.GetParameterValue(NithParameters.eyeRight_ape).Value.BaseAsDouble;
+                var valMou = (float)sensorData.GetParameterValue(NithParameters.mouth_ape).Value.BaseAsDouble; // TODO questa è a zero. Embé?
 
                 // Calibration
                 switch (CalibrationMode) // If calibration continuous, constantly update the thresholds
                 {
-                    case NithFaceCamCalibrationModes.Automatic_continuous:
+                    case NithFaceCamCalibrationModes.AutomaticContinuous:
                         // Update min and max
-                        if (val_LE < MIN_val_LE) MIN_val_LE = val_LE;
-                        if (val_LE > MAX_val_LE) MAX_val_LE = val_LE;
-                        if (val_RE < MIN_val_RE) MIN_val_RE = val_RE;
-                        if (val_RE > MAX_val_RE) MAX_val_RE = val_RE;
-                        if (val_MOU < MIN_val_MOU) MIN_val_MOU = val_MOU;
-                        if (val_MOU > MAX_val_MOU) MAX_val_MOU = val_MOU;
+                        if (valLe < _minValLe) _minValLe = valLe;
+                        if (valLe > _maxValLe) _maxValLe = valLe;
+                        if (valRe < _minValRe) _minValRe = valRe;
+                        if (valRe > _maxValRe) _maxValRe = valRe;
+                        if (valMou < _minValMou) _minValMou = valMou;
+                        if (valMou > _maxValMou) _maxValMou = valMou;
                         break;
+
                     case NithFaceCamCalibrationModes.Manual:
                         // Resolve calibrations
-                        if (isCalibratingOpen)
+                        if (_isCalibratingOpen)
                         {
-                            MAX_val_LE = val_LE;
-                            MAX_val_RE = val_RE;
-                            isCalibratingOpen = false;
+                            _maxValLe = valLe;
+                            _maxValRe = valRe;
+                            _maxValMou = valMou;
+                            _isCalibratingOpen = false;
                         }
-                        if (isCalibratingClosed)
+                        if (_isCalibratingClosed)
                         {
-                            MIN_val_LE = val_LE;
-                            MIN_val_RE = val_RE;
-                            isCalibratingClosed = false;
+                            _minValLe = valLe;
+                            _minValRe = valRe;
+                            _minValMou = valMou;
+                            _isCalibratingClosed = false;
                         }
                         break;
                 }
                 // Update deadzones
-                deadzone_LE = Math.Abs(MAX_val_LE - MIN_val_LE) * DEADZONE_PERC_LE;
-                deadzone_RE = Math.Abs(MAX_val_RE - MIN_val_RE) * DEADZONE_PERC_RE;
-                deadzone_MOU = Math.Abs(MAX_val_MOU - MIN_val_MOU) * DEADZONE_PERC_MOU;
+                _deadzoneLe = Math.Abs(_maxValLe - _minValLe) * DeadzonePercLe;
+                _deadzoneRe = Math.Abs(_maxValRe - _minValRe) * DeadzonePercRe;
+                _deadzoneMou = Math.Abs(_maxValMou - _minValMou) * DeadzonePercMou;
 
                 // Update thresholds (= min + OPENINGPERCENTAGE * distance between min and max)
-                threshold_LE = MIN_val_LE + OPENINGPERCENTAGE_LE * Math.Abs(MAX_val_LE - MIN_val_LE);
-                threshold_RE = MIN_val_RE + OPENINGPERCENTAGE_RE * Math.Abs(MAX_val_RE - MIN_val_RE);
-                threshold_MOU = MIN_val_MOU + OPENINGPERCENTAGE_MOU * Math.Abs(MAX_val_MOU - MIN_val_MOU);
-
+                _thresholdLe = _minValLe + OpeningpercentageLe * Math.Abs(_maxValLe - _minValLe);
+                _thresholdRe = _minValRe + OpeningpercentageRe * Math.Abs(_maxValRe - _minValRe);
+                _thresholdMou = _minValMou + OpeningpercentageMou * Math.Abs(_maxValMou - _minValMou);
 
                 // Reset mapping ranges (but introduce deadzones)
 
-                if (MIN_val_LE + deadzone_LE < MAX_val_LE - deadzone_LE)
-                    mapperLE.SetBaseRange(MIN_val_LE + deadzone_LE, MAX_val_LE - deadzone_LE);
+                if (_minValLe + _deadzoneLe < _maxValLe - _deadzoneLe)
+                    _mapperLe.SetBaseRange(_minValLe + _deadzoneLe, _maxValLe - _deadzoneLe);
 
-                if (MIN_val_RE + deadzone_RE < MAX_val_RE - deadzone_RE)
-                    mapperRE.SetBaseRange(MIN_val_RE + deadzone_RE, MAX_val_RE - deadzone_RE);
+                if (_minValRe + _deadzoneRe < _maxValRe - _deadzoneRe)
+                    _mapperRe.SetBaseRange(_minValRe + _deadzoneRe, _maxValRe - _deadzoneRe);
 
-                if (MIN_val_MOU < MAX_val_MOU - deadzone_MOU)
-                    mapperMOU.SetBaseRange(MIN_val_MOU, MAX_val_MOU - deadzone_MOU);
+                if (_minValMou < _maxValMou - _deadzoneMou)
+                    _mapperMou.SetBaseRange(_minValMou, _maxValMou - _deadzoneMou);
 
                 // Calculate aperture percentages
-                aperture_LE = (float)mapperLE.Map(val_LE);
-                aperture_RE = (float)mapperRE.Map(val_RE);
-                aperture_MOU = (float)mapperMOU.Map(val_MOU);
+                _apertureLe = (float)_mapperLe.Map(valLe);
+                _apertureRe = (float)_mapperRe.Map(valRe);
+                _apertureMou = (float)_mapperMou.Map(valMou);
 
                 // Application of a double threshold for blinks (one third up, one third down)
                 //float threshold_LE_up = threshold_LE + (Math.Abs(MAX_val_LE - MIN_val_LE) * 0.16f);
@@ -169,48 +205,47 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
                 //float threshold_RE_down = threshold_RE - (Math.Abs(MAX_val_RE - MIN_val_RE) * 0.16f);
 
                 // Wait a moment...
-                float edge_up = 66f;
-                float edge_down = 34f;
+                var edgeUp = 66f;
+                var edgeDown = 34f;
 
-                isOpen_MOU = val_MOU > threshold_MOU;
+                _isOpenMou = valMou > _thresholdMou;
 
                 if (!DoubleThreshBlinks)
                 {
                     // Calculate if eyes and mouth are open
-                    isOpen_LE = val_LE > threshold_LE;
-                    isOpen_RE = val_RE > threshold_RE;
-
+                    _isOpenLe = valLe > _thresholdLe;
+                    _isOpenRe = valRe > _thresholdRe;
                 }
                 else
                 {
                     // Check for double threshold application
-                    if (isOpen_LE)
+                    if (_isOpenLe)
                     {
-                        if (aperture_LE < edge_down)
+                        if (_apertureLe < edgeDown)
                         {
-                            isOpen_LE = false;
+                            _isOpenLe = false;
                         }
                     }
                     else
                     {
-                        if (aperture_LE > edge_up)
+                        if (_apertureLe > edgeUp)
                         {
-                            isOpen_LE = true;
+                            _isOpenLe = true;
                         }
                     }
 
-                    if (isOpen_RE)
+                    if (_isOpenRe)
                     {
-                        if (aperture_RE < edge_down)
+                        if (_apertureRe < edgeDown)
                         {
-                            isOpen_RE = false;
+                            _isOpenRe = false;
                         }
                     }
                     else
                     {
-                        if (aperture_RE > edge_up)
+                        if (_apertureRe > edgeUp)
                         {
-                            isOpen_RE = true;
+                            _isOpenRe = true;
                         }
                     }
                 }
@@ -218,52 +253,34 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
 
                 // Modify aperture values to include ranges =====
                 // Remove old args
-                sensorData.Values.RemoveAll(x => x.Argument == NithParameters.eyeLeft_ape);
-                sensorData.Values.RemoveAll(x => x.Argument == NithParameters.eyeRight_ape);
-                sensorData.Values.RemoveAll(x => x.Argument == NithParameters.mouth_ape);
+                sensorData.Values.RemoveAll(x => x.Parameter == NithParameters.eyeLeft_ape);
+                sensorData.Values.RemoveAll(x => x.Parameter == NithParameters.eyeRight_ape);
+                sensorData.Values.RemoveAll(x => x.Parameter == NithParameters.mouth_ape);
 
                 // Insert new args
                 // Insert Open/Close eyes and mouth
-                sensorData.Values.Add(new NithArgumentValue
+                sensorData.Values.Add(new()
                 {
-                    Argument = NithParameters.eyeLeft_isOpen,
-                    Base = isOpen_LE.ToString(),
+                    Parameter = NithParameters.eyeLeft_isOpen,
+                    Base = _isOpenLe.ToString(),
                     Type = NithDataTypes.OnlyBase
                 });
-                sensorData.Values.Add(new NithArgumentValue
+                sensorData.Values.Add(new()
                 {
-                    Argument = NithParameters.eyeRight_isOpen,
-                    Base = isOpen_RE.ToString(),
+                    Parameter = NithParameters.eyeRight_isOpen,
+                    Base = _isOpenRe.ToString(),
                     Type = NithDataTypes.OnlyBase
                 });
-                sensorData.Values.Add(new NithArgumentValue
+                sensorData.Values.Add(new()
                 {
-                    Argument = NithParameters.mouth_isOpen,
-                    Base = isOpen_MOU.ToString(),
+                    Parameter = NithParameters.mouth_isOpen,
+                    Base = _isOpenMou.ToString(),
                     Type = NithDataTypes.OnlyBase
                 });
 
-                sensorData.Values.Add(new NithArgumentValue()
-                {
-                    Argument = NithParameters.eyeLeft_ape,
-                    Base = aperture_LE.ToString("0.00", CultureInfo.InvariantCulture),
-                    Max = "100",
-                    Type = NithDataTypes.BaseAndMax
-                });
-                sensorData.Values.Add(new NithArgumentValue()
-                {
-                    Argument = NithParameters.eyeRight_ape,
-                    Base = aperture_RE.ToString("0.00", CultureInfo.InvariantCulture),
-                    Max = "100",
-                    Type = NithDataTypes.BaseAndMax
-                });
-                sensorData.Values.Add(new NithArgumentValue()
-                {
-                    Argument = NithParameters.mouth_ape,
-                    Base = aperture_MOU.ToString("0.00", CultureInfo.InvariantCulture),
-                    Max = "100",
-                    Type = NithDataTypes.BaseAndMax
-                });
+                sensorData.Values.Add(new(NithParameters.eyeLeft_ape, _apertureLe.ToString("0.00", CultureInfo.InvariantCulture), "100"));
+                sensorData.Values.Add(new(NithParameters.eyeRight_ape, _apertureRe.ToString("0.00", CultureInfo.InvariantCulture), "100"));
+                sensorData.Values.Add(new(NithParameters.mouth_ape, _apertureMou.ToString("0.00", CultureInfo.InvariantCulture), "100"));
             }
 
             // Return ==========
@@ -271,4 +288,3 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
         }
     }
 }
-

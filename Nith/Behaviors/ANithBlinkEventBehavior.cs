@@ -8,111 +8,135 @@ namespace NITHlibrary.Nith.Behaviors
     /// </summary>
     public abstract class ANithBlinkEventBehavior : INithSensorBehavior
     {
-        public const int DEFAULTTHRESH = 5;
+        public const int Defaultthresh = 5;
 
-        private readonly List<NithParameters> requiredArguments = new()
-        {
-            NithParameters.eyeLeft_isOpen, NithParameters.eyeRight_isOpen
-        };
+        private readonly List<NithParameters> _requiredArguments =
+        [
+            NithParameters.eyeLeft_isOpen,
+            NithParameters.eyeRight_isOpen
+        ];
 
-        protected int counter_DE_C = 0;
-        protected int counter_DE_O = 0;
-        protected int counter_LE_C = 0;
-        protected int counter_LE_O = 0;
-        protected int counter_RE_C = 0;
-        protected int counter_RE_O = 0;
+        // Counters for tracking the state of the eyes
+        protected int CounterDeC = 0; // Double eye close counter
+        protected int CounterDeO = 0; // Double eye open counter
+        protected int CounterLeC = 0; // Left eye close counter
+        protected int CounterLeO = 0; // Left eye open counter
+        protected int CounterReC = 0; // Right eye close counter
+        protected int CounterReO = 0; // Right eye open counter
 
-        // Thresholds
-        public int DCThresh { get; set; } = DEFAULTTHRESH;
-        public int DOThresh { get; set; } = DEFAULTTHRESH;
-        public int LCThresh { get; set; } = DEFAULTTHRESH;
-        public int LOThresh { get; set; } = DEFAULTTHRESH;
-        public int RCThresh { get; set; } = DEFAULTTHRESH;
-        public int ROThresh { get; set; } = DEFAULTTHRESH;
+        // Thresholds for triggering events
+        public int DcThresh { get; set; } = Defaultthresh;
+        public int DoThresh { get; set; } = Defaultthresh;
+        public int LcThresh { get; set; } = Defaultthresh;
+        public int LoThresh { get; set; } = Defaultthresh;
+        public int RcThresh { get; set; } = Defaultthresh;
+        public int RoThresh { get; set; } = Defaultthresh;
 
+        /// <summary>
+        /// Handles incoming sensor data and updates the blink counters accordingly. Triggers events if thresholds are met.
+        /// </summary>
+        /// <param name="nithData">The sensor data received.</param>
         public void HandleData(NithSensorData nithData)
         {
-            if (nithData.ContainsParameters(requiredArguments))
+            if (nithData.ContainsParameters(_requiredArguments))
             {
-                bool isLEopen = bool.Parse(nithData.GetParameter(NithParameters.eyeLeft_isOpen).Value.Base);
-                bool isREopen = bool.Parse(nithData.GetParameter(NithParameters.eyeRight_isOpen).Value.Base);
+                var isLEopen = bool.Parse(nithData.GetParameterValue(NithParameters.eyeLeft_isOpen).Value.Base);
+                var isREopen = bool.Parse(nithData.GetParameterValue(NithParameters.eyeRight_isOpen).Value.Base);
 
-                // Update counters
-                if (isLEopen == false && isREopen == true) // Left eye is blinking
+                // Update counters based on the state of the eyes
+                if (!isLEopen && isREopen) // Left eye is blinking
                 {
-                    counter_LE_O = 0;
-                    counter_LE_C++;
-                    counter_RE_O++;
-                    counter_RE_C = 0;
-                    counter_DE_O = 0;
-                    counter_DE_C = 0;
+                    CounterLeO = 0;
+                    CounterLeC++;
+                    CounterReO++;
+                    CounterReC = 0;
+                    CounterDeO = 0;
+                    CounterDeC = 0;
                 }
-                else if (isLEopen == true && isREopen == false) // Right eye is blinking
+                else if (isLEopen && !isREopen) // Right eye is blinking
                 {
-                    counter_LE_O++;
-                    counter_LE_C = 0;
-                    counter_RE_O = 0;
-                    counter_RE_C++;
-                    counter_DE_O = 0;
-                    counter_DE_C = 0;
+                    CounterLeO++;
+                    CounterLeC = 0;
+                    CounterReO = 0;
+                    CounterReC++;
+                    CounterDeO = 0;
+                    CounterDeC = 0;
                 }
-                else if (isLEopen == false && isREopen == false) // Double eye blinking
+                else if (!isLEopen && !isREopen) // Double eye blinking
                 {
-                    counter_LE_O = 0;
-                    counter_LE_C = 0;
-                    counter_RE_O = 0;
-                    counter_RE_C = 0;
-                    counter_DE_O = 0;
-                    counter_DE_C++;
+                    CounterLeO = 0;
+                    CounterLeC = 0;
+                    CounterReO = 0;
+                    CounterReC = 0;
+                    CounterDeO = 0;
+                    CounterDeC++;
                 }
-                else if (isLEopen == true && isREopen == true) // No blinking
+                else if (isLEopen && isREopen) // No blinking
                 {
-                    counter_LE_O++;
-                    counter_LE_C = 0;
-                    counter_RE_O++;
-                    counter_RE_C = 0;
-                    counter_DE_O++;
-                    counter_DE_C = 0;
+                    CounterLeO++;
+                    CounterLeC = 0;
+                    CounterReO++;
+                    CounterReC = 0;
+                    CounterDeO++;
+                    CounterDeC = 0;
                 }
 
-                // If thresholds are met, send to events
-                if (counter_LE_O == LOThresh)
+                // Trigger events if thresholds are met
+                if (CounterLeO == LoThresh)
                 {
                     Event_leftOpen();
                 }
-                if (counter_LE_C == LCThresh)
+                if (CounterLeC == LcThresh)
                 {
                     Event_leftClose();
                 }
-                if (counter_RE_O == ROThresh)
+                if (CounterReO == RoThresh)
                 {
                     Event_rightOpen();
                 }
-                if (counter_RE_C == RCThresh)
+                if (CounterReC == RcThresh)
                 {
                     Event_rightClose();
                 }
-                if (counter_DE_O == DOThresh)
+                if (CounterDeO == DoThresh)
                 {
                     Event_doubleOpen();
                 }
-                if (counter_DE_C == DCThresh)
+                if (CounterDeC == DcThresh)
                 {
                     Event_doubleClose();
                 }
             }
         }
 
+        /// <summary>
+        /// Event triggered when both eyes are closed for the defined threshold.
+        /// </summary>
         protected abstract void Event_doubleClose();
 
+        /// <summary>
+        /// Event triggered when both eyes are open for the defined threshold.
+        /// </summary>
         protected abstract void Event_doubleOpen();
 
+        /// <summary>
+        /// Event triggered when the left eye is closed for the defined threshold.
+        /// </summary>
         protected abstract void Event_leftClose();
 
+        /// <summary>
+        /// Event triggered when the left eye is open for the defined threshold.
+        /// </summary>
         protected abstract void Event_leftOpen();
 
+        /// <summary>
+        /// Event triggered when the right eye is closed for the defined threshold.
+        /// </summary>
         protected abstract void Event_rightClose();
 
+        /// <summary>
+        /// Event triggered when the right eye is open for the defined threshold.
+        /// </summary>
         protected abstract void Event_rightOpen();
     }
 }

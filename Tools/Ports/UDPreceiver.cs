@@ -1,63 +1,101 @@
-﻿using System.Net;
+﻿using NITHlibrary.Tools.Logging;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using NITHlibrary.Tools.Logging;
 
 namespace NITHlibrary.Tools.Ports
 {
+    /// <summary>
+    /// Class for receiving UDP packets.
+    /// Implements <see cref="IDisposable"/> for proper cleanup of resources.
+    /// Accepts a list of listeners to notify when data is received.
+    /// </summary>
     public class UDPreceiver : IDisposable
     {
-        public const int DEFAULT_NITH_UDP_PORT = 20100;
-        private UdpClient Client;
-        private int port;
+        /// <summary>
+        /// Default UDP port used by the receiver.
+        /// </summary>
+        public const int DefaultNithUdpPort = 20100;
 
-        public UDPreceiver(int port = DEFAULT_NITH_UDP_PORT)
+        private UdpClient _client;
+        private int _port;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UDPreceiver"/> class with the specified port.
+        /// </summary>
+        /// <param name="port">The port to listen on.</param>
+        public UDPreceiver(int port = DefaultNithUdpPort)
         {
-            this.port = port;
+            this._port = port;
         }
 
+        /// <summary>
+        /// Gets a value indicating whether the receiver is connected.
+        /// </summary>
         public bool IsConnected { get; private set; } = false;
 
-        public List<IPortListener> Listeners { get; set; } = new List<IPortListener>();
+        /// <summary>
+        /// Gets or sets the list of listeners to receive port data notifications.
+        /// </summary>
+        public List<IPortListener> Listeners { get; set; } = [];
 
+        /// <summary>
+        /// Gets or sets the port number for the receiver.
+        /// Automatically adjusts if the value is less than 1.
+        /// </summary>
         public int Port
         {
-            get { return port; }
+            get => _port;
             set
             {
-                if (value < 1) port = 1;
-                else port = value;
+                if (value < 1) _port = 1;
+                else _port = value;
             }
         }
 
+        /// <summary>
+        /// Connects the UDP receiver to the specified port.
+        /// </summary>
         public void Connect()
         {
             IsConnected = InitializeUdp();
         }
 
+        /// <summary>
+        /// Disconnects the UDP receiver.
+        /// </summary>
         public void Disconnect()
         {
-            Client?.Close();
+            _client?.Close();
             IsConnected = false;
         }
 
+        /// <summary>
+        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+        /// Should be disposed to ensure UDP port is released.
+        /// </summary>
         public void Dispose()
         {
-            Client?.Close();
-            Client?.Dispose();
+            _client?.Close();
+            _client?.Dispose();
+            GC.SuppressFinalize(this); // Added this line to address CA1816
         }
 
+        /// <summary>
+        /// Initializes the UDP client and begins listening for incoming data.
+        /// </summary>
+        /// <returns><c>true</c> if the initialization succeeded, otherwise <c>false</c>.</returns>
         private bool InitializeUdp()
         {
-            Client?.Close();
-            Client?.Dispose();
+            _client?.Close();
+            _client?.Dispose();
 
             // Client uses as receive udp client
-            Client = new UdpClient(Port);
+            _client = new(Port);
 
             try
             {
-                Client.BeginReceive(new AsyncCallback(Receive), null);
+                _client.BeginReceive(new(Receive), null);
                 Console.WriteLine("UDP port connected!");
                 return true;
             }
@@ -68,7 +106,22 @@ namespace NITHlibrary.Tools.Ports
             }
         }
 
-        // CallBack
+        /// <summary>
+        /// Notifies all listeners with the received data.
+        /// </summary>
+        /// <param name="line">The data received from the UDP port.</param>
+        private void NotifyListeners(string line)
+        {
+            foreach (var listener in Listeners)
+            {
+                listener.ReceivePortData(line);
+            }
+        }
+
+        /// <summary>
+        /// Callback method invoked when data is received on the UDP port.
+        /// </summary>
+        /// <param name="res">The result of the asynchronous receive operation.</param>
         private void Receive(IAsyncResult res)
         {
             if (!IsConnected)
@@ -76,8 +129,8 @@ namespace NITHlibrary.Tools.Ports
 
             try
             {
-                IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, Port);
-                byte[] received = Client.EndReceive(res, ref RemoteIpEndPoint);
+                IPEndPoint remoteIpEndPoint = new(IPAddress.Any, Port);
+                var received = _client.EndReceive(res, ref remoteIpEndPoint);
                 NotifyListeners(Encoding.UTF8.GetString(received));
             }
             catch (Exception e)
@@ -88,18 +141,10 @@ namespace NITHlibrary.Tools.Ports
             finally
             {
                 // Solution to reconnect automatically on error
-                if (Client != null && IsConnected)
+                if (_client != null && IsConnected)
                 {
-                    Client.BeginReceive(new AsyncCallback(Receive), null);
+                    _client.BeginReceive(new(Receive), null);
                 }
-            }
-        }
-
-        private void NotifyListeners(string line)
-        {
-            foreach (IPortListener listener in Listeners)
-            {
-                listener.ReceivePortData(line);
             }
         }
     }

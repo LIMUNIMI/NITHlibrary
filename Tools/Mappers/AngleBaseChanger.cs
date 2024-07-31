@@ -1,39 +1,41 @@
 ﻿namespace NITHlibrary.Tools.Mappers
 {
     /// <summary>
-    /// Does your gyroscope or whatever return you angles in [-180; +180]° or [0; +360]° format, and you want to move the center wherever you desire?
-    /// Here I am!
+    /// Provides functionality to adjust angle measurements returned by sensors such as gyroscopes. 
+    /// Converts sensor-read angles to a new reference system, [-180; +180]°, and makes it possible to change the center reference.
+    /// This is useful, for example,to calibrate the gyroscope center.
     /// </summary>
     public class AngleBaseChanger
     {
-        private double deltaBar = 180;
-        private double delta = 0;
+        private double _deltaBar = 180;
+        private double _delta;
 
         /// <summary>
-        /// Defines the new rotated base. Delta is the angle that your sensor read when your gyro is in the desired center.
+        /// Gets or sets the angle offset used to determine the new center for angle calculations.
         /// </summary>
         public double Delta
         {
-            get { return delta; }
+            get => _delta;
             set
             {
-                delta = value;
+                _delta = value;
                 if (value >= 0)
                 {
-                    deltaBar = -180 + value;
+                    _deltaBar = -180 + value;
                 }
                 else
                 {
-                    deltaBar = 180 + value;
+                    _deltaBar = 180 + value;
                 }
             }
         }
 
         /// <summary>
-        /// Converts a sensor read into the new base defined by delta. Output will be in [-180; +180]° format.
+        /// Converts an angle measurement read by the sensor to the new base defined by <see cref="Delta"/>.
+        /// The output angle will be in the range of [-180; +180] degrees.
         /// </summary>
-        /// <param name="angle">The angle read by the sensor</param>
-        /// <returns></returns>
+        /// <param name="angle">The angle read by the sensor.</param>
+        /// <returns>The transformed angle in the new base.</returns>
         public double Transform(double angle)
         {
             // Put angle in [-180;+180] format
@@ -47,36 +49,30 @@
             }
 
             // Transformations
-
             double res = 0;
-            if (delta >= 0)
+            if (_delta >= 0)
             {
-                if (angle > deltaBar)
+                if (angle > _deltaBar)
                 {
-                    res = angle - delta;
+                    res = angle - _delta;
                 }
                 else
                 {
-                    res = 180 + angle - deltaBar;
+                    res = 180 + angle - _deltaBar;
                 }
             }
-            else if (delta < 0)
+            else if (_delta < 0)
             {
-                if (angle < deltaBar)
+                if (angle < _deltaBar)
                 {
-                    res = angle - delta;
+                    res = angle - _delta;
                 }
                 else
                 {
-                    res = -180 + angle - deltaBar;
+                    res = -180 + angle - _deltaBar;
                 }
             }
             return res;
         }
-
-
-
-
-
     }
 }

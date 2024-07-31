@@ -3,39 +3,52 @@
 namespace NITHlibrary.Tools.Filters.PointFilters
 {
     /// <summary>
-    /// An array-based moving average filter. Calculates the average of the last [arrayDimension] points.
+    /// An array-based moving average filter (FIFO logic).
+    /// Calculates the average of the last [arrayDimension] points.
     /// </summary>
-    public class PointFilterMAArray : IPointFilter
+    public class PointFilterMAarray : IPointFilter
     {
-        private Point[] points;
+        private readonly Point[] _points;
 
-        public PointFilterMAArray(int arrayDimension)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PointFilterMAarray"/> class with the specified array dimension.
+        /// </summary>
+        /// <param name="arrayDimension">The number of points over which to calculate the moving average.</param>
+        public PointFilterMAarray(int arrayDimension)
         {
-            points = new Point[arrayDimension];
+            _points = new Point[arrayDimension];
         }
 
+        /// <summary>
+        /// Adds a new point to the array and updates the moving average.
+        /// </summary>
+        /// <param name="point">The point to add to the moving average calculation.</param>
         public void Push(Point point)
         {
-            for (int i = 0; i < points.Length - 1; i++)
+            for (var i = 0; i < _points.Length - 1; i++)
             {
-                points[i + 1] = points[i];
+                _points[i + 1] = _points[i];
             }
 
-            points[0] = point;
+            _points[0] = point;
         }
 
+        /// <summary>
+        /// Gets the current moving average point..
+        /// </summary>
+        /// <returns>The current moving average point.</returns>
         public Point GetOutput()
         {
-            int x = 0;
-            int y = 0;
-            foreach (Point point in points)
+            var x = 0;
+            var y = 0;
+            foreach (var point in _points)
             {
                 x += point.X;
                 y += point.Y;
             }
-            x = x / points.Length;
-            y = y / points.Length;
-            return new Point(x, y);
+            x = x / _points.Length;
+            y = y / _points.Length;
+            return new(x, y);
         }
     }
 }

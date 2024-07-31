@@ -2,33 +2,46 @@
 
 namespace NITHlibrary.Tools.Filters.PointFilters
 {
-    public class PointFilterMAExpDecaying : IPointFilter
+    /// <summary>
+    /// Implements an exponentially decaying moving average filter for Point objects.
+    /// This filter reduces the impact of older points over time based on the specified decay factor.
+    /// </summary>
+    public class PointFilterMAexpDecaying : IPointFilter
     {
-        private Point PointI = new Point(0, 0);
-        private Point PointIplusOne = new Point(0, 0);
-        private float alpha;
+        private Point _pointI = new(0, 0);
+        private Point _pointIplusOne = new(0, 0);
+        private readonly float _alpha;
 
         /// <summary>
-        /// The classic implementation of an exponentially decaying moving average filter. 
+        /// Initializes a new instance of the <see cref="PointFilterMAexpDecaying"/> class.
         /// </summary>
-        /// <param name="alpha">Indicates the speed of decreasing priority of the old values.</param>
-        public PointFilterMAExpDecaying(float alpha)
+        /// <param name="alpha">Indicates the speed of decreasing priority of the old values.
+        /// The higher this value, the faster the response will be over time. 
+        /// The lower this value, the slower but more smooth will be the response over time.</param>
+        public PointFilterMAexpDecaying(float alpha)
         {
-            this.alpha = alpha;
+            this._alpha = alpha;
         }
 
+        /// <summary>
+        /// Pushes a new point into the filter, updating the moving average.
+        /// </summary>
+        /// <param name="point">The new point to be pushed into the filter.</param>
         public void Push(Point point)
         {
-            PointI.X = PointIplusOne.X;
-            PointI.Y = PointIplusOne.Y;
-            PointIplusOne.X = (int)(alpha * point.X) + (int)((1 - alpha) * PointI.X);
-            PointIplusOne.Y = (int)(alpha * point.Y) + (int)((1 - alpha) * PointI.Y);
+            _pointI.X = _pointIplusOne.X;
+            _pointI.Y = _pointIplusOne.Y;
+            _pointIplusOne.X = (int)(_alpha * point.X) + (int)((1 - _alpha) * _pointI.X);
+            _pointIplusOne.Y = (int)(_alpha * point.Y) + (int)((1 - _alpha) * _pointI.Y);
         }
 
+        /// <summary>
+        /// Gets the filtered output point based on the moving average.
+        /// </summary>
+        /// <returns>The current output point of the filter.</returns>
         public Point GetOutput()
         {
-
-            return new Point(PointIplusOne.X, PointIplusOne.Y);
+            return new Point(_pointIplusOne.X, _pointIplusOne.Y);
         }
     }
 }
