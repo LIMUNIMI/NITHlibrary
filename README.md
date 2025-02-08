@@ -1,6 +1,6 @@
 # NITHlibrary
 
-__A C# Library for Interfacing NITH Sensor Peripherals and Wrappers__
+_A C# Library for Interfacing NITH Sensor Peripherals and Wrappers_
 
 <div align="center">
   <img src="NithLogo_Black_Trace.png" alt="NITH logo." width="150px"/>
@@ -21,8 +21,8 @@ NITHlibrary proposes a functional structure for organizing your application's co
 Modules generally receive data in some manner. Most "modules" in the NITH framework libraries (including NITHlibrary) accept a series of "Behaviors". Behaviors are classes that implement a specific interface, defining actions to be taken with the incoming data. Each module can accept an unlimited number of behaviors and will forward all data to the various behaviors in the list. This design allows for easy and runtime modification of the application's behavior.
 
 ## How to use
-NITHlibrary is built using C# within __Microsoft Visual Studio__. We recommend using the same for an optimal development experience.
-In order to use NITHlibrary you can simply clone this repo, place its folder next to your project folder and add a reference to it within your project (and/or add it to your __Solution__ in __Visual Studio__).
+NITHlibrary is built using C# within _Microsoft Visual Studio_. We recommend using the same for an optimal development experience.
+In order to use NITHlibrary you can simply clone this repo, place its folder next to your project folder and add a reference to it within your project (and/or add it to your _Solution_ in _Visual Studio_).
 
 - [ ] Precompiled DLLs will be available soon.
 
