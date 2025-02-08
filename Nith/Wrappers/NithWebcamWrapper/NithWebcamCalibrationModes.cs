@@ -1,9 +1,9 @@
-﻿namespace NITHlibrary.Nith.Wrappers.NithFaceCam
+﻿namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
 {
     /// <summary>
     /// Enum representing the various calibration modes for the NithFaceCam.
     /// </summary>
-    public enum NithFaceCamCalibrationModes
+    public enum NithWebcamCalibrationModes
     {
         /// <summary>
         /// With this mode, the calibration is done automatically. The maximum and the minimum values are continuously updated, deducing them from the incoming data.

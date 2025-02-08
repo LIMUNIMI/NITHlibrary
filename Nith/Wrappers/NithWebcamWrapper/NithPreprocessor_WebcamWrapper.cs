@@ -4,7 +4,7 @@ using NITHlibrary.Nith.Preprocessors;
 using NITHlibrary.Tools.Mappers;
 using System.Globalization;
 
-namespace NITHlibrary.Nith.Wrappers.NithFaceCam
+namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
 {
     /// <summary>
     /// Preprocessor for NITHwebcamWrapper.
@@ -12,7 +12,7 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
     /// - Eyes and mouth aperture calibration (taking into account the user's maximum and minimum aperture). Eyes and mouth aperture values will then be from 0 to 1 (and the Normalized value will become available)
     /// - Extracting the boolean values for mouth and eyes aperture (which simply state if the aperture is above a certain threshold)
     /// </summary>
-    public class NithPreprocessor_FaceCam : INithPreprocessor
+    public class NithPreprocessor_WebcamWrapper : INithPreprocessor
     {
         // Deadzone percentages
         private const float DeadzonePercLe = 0.2f;
@@ -43,7 +43,7 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
             NithParameters.mouth_ape
         ];
 
-        private readonly List<string> _requiredSensorName = ["NITHfaceCam"];
+        private readonly List<string> _requiredSensorName = ["NITHwebcamWrapper"];
 
         // Required sensor name ofr this preprocessor to intervene
         private float _apertureLe = 0;
@@ -88,11 +88,11 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
         private float _thresholdRe = 0;
 
         /// <summary>
-        /// Creates a new instance of the <see cref="NithPreprocessor_FaceCam"/> class.
+        /// Creates a new instance of the <see cref="NithPreprocessor_WebcamWrapper"/> class.
         /// </summary>
         /// <param name="calibrationMode">Specifies how the calibration will be performed.</param>
         /// <param name="doubleThreshBlinks">Should a double threshold be applied for blink detection? (Usually more robust)</param>
-        public NithPreprocessor_FaceCam(NithFaceCamCalibrationModes calibrationMode = NithFaceCamCalibrationModes.AutomaticContinuous, bool doubleThreshBlinks = true)
+        public NithPreprocessor_WebcamWrapper(NithWebcamCalibrationModes calibrationMode = NithWebcamCalibrationModes.AutomaticContinuous, bool doubleThreshBlinks = true)
         {
             CalibrationMode = calibrationMode;
             _mapperLe = new(0, 100, 0, 100, true);
@@ -104,7 +104,7 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
         /// <summary>
         /// Specifies the calibration mode.
         /// </summary>
-        public NithFaceCamCalibrationModes CalibrationMode { get; set; }
+        public NithWebcamCalibrationModes CalibrationMode { get; set; }
 
         /// <summary>
         /// Specifies if a double threshold should be applied for the detecton of eye blinks (usually more robust).
@@ -112,7 +112,7 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
         public bool DoubleThreshBlinks { get; set; }
 
         /// <summary>
-        /// If <see cref="NithFaceCamCalibrationModes.Manual"/> is set, this method should be called to calibrate the closed state. To do this, the user should close both eyes and mouth.
+        /// If <see cref="NithWebcamCalibrationModes.Manual"/> is set, this method should be called to calibrate the closed state. To do this, the user should close both eyes and mouth.
         /// </summary>
         public void Calibrate_Closed()
         {
@@ -120,7 +120,7 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
         }
 
         /// <summary>
-        /// If <see cref="NithFaceCamCalibrationModes.Manual"/> is set, this method should be called to calibrate the open state. To do this, the user should open both eyes and mouth.
+        /// If <see cref="NithWebcamCalibrationModes.Manual"/> is set, this method should be called to calibrate the open state. To do this, the user should open both eyes and mouth.
         /// </summary>
         public void Calibrate_Open()
         {
@@ -144,7 +144,7 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
                 // Calibration
                 switch (CalibrationMode) // If calibration continuous, constantly update the thresholds
                 {
-                    case NithFaceCamCalibrationModes.AutomaticContinuous:
+                    case NithWebcamCalibrationModes.AutomaticContinuous:
                         // Update min and max
                         if (valLe < _minValLe) _minValLe = valLe;
                         if (valLe > _maxValLe) _maxValLe = valLe;
@@ -154,7 +154,7 @@ namespace NITHlibrary.Nith.Wrappers.NithFaceCam
                         if (valMou > _maxValMou) _maxValMou = valMou;
                         break;
 
-                    case NithFaceCamCalibrationModes.Manual:
+                    case NithWebcamCalibrationModes.Manual:
                         // Resolve calibrations
                         if (_isCalibratingOpen)
                         {

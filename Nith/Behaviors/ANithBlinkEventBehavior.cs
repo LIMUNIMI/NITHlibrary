@@ -17,20 +17,20 @@ namespace NITHlibrary.Nith.Behaviors
         ];
 
         // Counters for tracking the state of the eyes
-        protected int CounterDeC = 0; // Double eye close counter
-        protected int CounterDeO = 0; // Double eye open counter
-        protected int CounterLeC = 0; // Left eye close counter
-        protected int CounterLeO = 0; // Left eye open counter
-        protected int CounterReC = 0; // Right eye close counter
-        protected int CounterReO = 0; // Right eye open counter
+        protected int CounterDEC = 0; // Double eye close counter
+        protected int CounterDEO = 0; // Double eye open counter
+        protected int CounterLEC = 0; // Left eye close counter
+        protected int CounterLEO = 0; // Left eye open counter
+        protected int CounterREC = 0; // Right eye close counter
+        protected int CounterREO = 0; // Right eye open counter
 
         // Thresholds for triggering events
-        public int DcThresh { get; set; } = Defaultthresh;
-        public int DoThresh { get; set; } = Defaultthresh;
-        public int LcThresh { get; set; } = Defaultthresh;
-        public int LoThresh { get; set; } = Defaultthresh;
-        public int RcThresh { get; set; } = Defaultthresh;
-        public int RoThresh { get; set; } = Defaultthresh;
+        public int DCThresh { get; set; } = Defaultthresh;
+        public int DOThresh { get; set; } = Defaultthresh;
+        public int LCThresh { get; set; } = Defaultthresh;
+        public int LOThresh { get; set; } = Defaultthresh;
+        public int RCThresh { get; set; } = Defaultthresh;
+        public int ROThresh { get; set; } = Defaultthresh;
 
         /// <summary>
         /// Handles incoming sensor data and updates the blink counters accordingly. Triggers events if thresholds are met.
@@ -46,63 +46,63 @@ namespace NITHlibrary.Nith.Behaviors
                 // Update counters based on the state of the eyes
                 if (!isLEopen && isREopen) // Left eye is blinking
                 {
-                    CounterLeO = 0;
-                    CounterLeC++;
-                    CounterReO++;
-                    CounterReC = 0;
-                    CounterDeO = 0;
-                    CounterDeC = 0;
+                    CounterLEO = 0;
+                    CounterLEC++;
+                    CounterREO++;
+                    CounterREC = 0;
+                    CounterDEO = 0;
+                    CounterDEC = 0;
                 }
                 else if (isLEopen && !isREopen) // Right eye is blinking
                 {
-                    CounterLeO++;
-                    CounterLeC = 0;
-                    CounterReO = 0;
-                    CounterReC++;
-                    CounterDeO = 0;
-                    CounterDeC = 0;
+                    CounterLEO++;
+                    CounterLEC = 0;
+                    CounterREO = 0;
+                    CounterREC++;
+                    CounterDEO = 0;
+                    CounterDEC = 0;
                 }
                 else if (!isLEopen && !isREopen) // Double eye blinking
                 {
-                    CounterLeO = 0;
-                    CounterLeC = 0;
-                    CounterReO = 0;
-                    CounterReC = 0;
-                    CounterDeO = 0;
-                    CounterDeC++;
+                    CounterLEO = 0;
+                    CounterLEC = 0;
+                    CounterREO = 0;
+                    CounterREC = 0;
+                    CounterDEO = 0;
+                    CounterDEC++;
                 }
                 else if (isLEopen && isREopen) // No blinking
                 {
-                    CounterLeO++;
-                    CounterLeC = 0;
-                    CounterReO++;
-                    CounterReC = 0;
-                    CounterDeO++;
-                    CounterDeC = 0;
+                    CounterLEO++;
+                    CounterLEC = 0;
+                    CounterREO++;
+                    CounterREC = 0;
+                    CounterDEO++;
+                    CounterDEC = 0;
                 }
 
                 // Trigger events if thresholds are met
-                if (CounterLeO == LoThresh)
+                if (CounterLEO == LOThresh)
                 {
                     Event_leftOpen();
                 }
-                if (CounterLeC == LcThresh)
+                if (CounterLEC == LCThresh)
                 {
                     Event_leftClose();
                 }
-                if (CounterReO == RoThresh)
+                if (CounterREO == ROThresh)
                 {
                     Event_rightOpen();
                 }
-                if (CounterReC == RcThresh)
+                if (CounterREC == RCThresh)
                 {
                     Event_rightClose();
                 }
-                if (CounterDeO == DoThresh)
+                if (CounterDEO == DOThresh)
                 {
                     Event_doubleOpen();
                 }
-                if (CounterDeC == DcThresh)
+                if (CounterDEC == DCThresh)
                 {
                     Event_doubleClose();
                 }
