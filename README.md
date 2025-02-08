@@ -5,6 +5,7 @@ _A C# Library for Interfacing NITH Sensor Peripherals and Wrappers_
 <div align="center">
   <img src="NithLogo_Black_Trace.png" alt="NITH logo." width="150px"/>
 </div>
+<br/>
 
 NITHlibrary is the main component of the NITH framework, a framework for developing accessible software and tools dedicated to individuals with tetraplegia.
 
