@@ -1,6 +1,6 @@
 ﻿using NITHlibrary.Nith.Internals;
 
-namespace NITHlibrary.Nith.Behaviors
+namespace NITHlibrary.Nith.BehaviorTemplates
 {
     /// <summary>
     /// A metabehavior which converts NITH parameters into a string that is comfortable to read (e.g., in console output or in a TextBox).

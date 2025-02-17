@@ -20,105 +20,138 @@ NITHlibrary proposes a functional structure for organizing your application's co
 
 Modules generally receive data in some manner. Most "modules" in the NITH framework libraries (including NITHlibrary) accept a series of "Behaviors". Behaviors are classes that implement a specific interface, defining actions to be taken with the incoming data. Each module can accept an unlimited number of behaviors and will forward all data to the various behaviors in the list. This design allows for easy and runtime modification of the application's behavior.
 
-## How to use
+## How to use it
 NITHlibrary is built using C# within __Microsoft Visual Studio__. We recommend using the same for an optimal development experience.
 In order to use NITHlibrary you can simply clone this repo, place its folder next to your project folder and add a reference to it within your project (and/or add it to your __Solution__ in __Visual Studio__).
 
 - [ ] Precompiled DLLs will be available soon.
 
-## Contents overview
+## Contents Overview
 
 The following is a brief explanation of the main components. See the documentation within the code for more explanations on the available tools.
 
-### Port Receivers
-These receive and redirect incoming data to the listeners.
-
-`NithModule` instances need to be connected (i.e. added as a listener) to a port receiver in order to receive data.
-
-`USBreceiver` is a class that manages serial communication over COM ports using the .NET SerialPort. It allows you to:
-
-- **Connect**: Opens a serial connection to the specified COM port (e.g., COM1, COM2, etc.). If the port is already open, it closes and reopens it. It also sets up a timeout mechanism that disconnects if no data is received within a given interval.
-- **Add Listeners**: Maintains a list of registered listeners (objects implementing the IPortListener interface). When data is received through the serial port, the data is forwarded to all registered listeners via their ReceivePortData method.
-- **Disconnect**: Closes the serial port connection and updates the connection status accordingly.
-- **Data Handling**: Uses the DataReceived event to read lines from the port and immediately transfer them to all listeners. A timeout timer is used to automatically disconnect if data is not received in time.
-
-`UDPreceiver` is a class designed for receiving data over UDP. It operates as follows:
-
-- **Connect**: Initializes a UdpClient on the specified port (default is 20100) and begins listening for incoming UDP packets. If the connection is successful, it maintains an open socket for receiving data.
-- **Add Listeners**: Like USBreceiver, it maintains a list of listeners that implement the IPortListener interface. When a UDP packet is received, the packet (after being decoded from UTF-8) is forwarded to all registered listeners.
-- **Automatic Reconnection**: After each asynchronous receive operation (or in case of an error), the UDPreceiver automatically starts another asynchronous receive call, ensuring continuous data monitoring until disconnected.
-- **Disconnect and Cleanup**: Provides proper methods to disconnect and dispose of resources to release the UDP port when no longer needed.
-
 ### NithModule
 
-At the core is the **NithModule**. This class is responsible for:
-- **Data Acquisition**: Receiving raw data strings from NITH sensors.
-- **Data Parsing**: Converting raw sensor input into structured `NithSensorData` objects which encapsulate details such as the sensor’s name, version, status code, and a collection of parameter values.
-- **Behavior Dispatch**: Distributing parsed sensor data to two sets of behaviors:
-  - **Sensor Behaviors** (defined by the `INithSensorBehavior` interface) process the sensor data.
-  - **Error Behaviors** (defined by the `INithErrorBehavior` interface) handle any issues that occur during data processing, such as connection problems, protocol violations, or missing parameters.
+The `NithModule` class is the main component for managing data from NITH sensors and wrappers within the NITHlibrary.
+Key features of the `NithModule` include:
 
-In addition, the **NithModule** can filter incoming data using configurable lists of expected sensor names, versions, and parameters. This ensures that only valid and supported sensor data is processed; otherwise, the relevant error behavior is triggered.
+- **Data Reception**: It reads raw data strings from NITH sensors and processes them into structured `NithSensorData` objects.
+- **Parameter Filtering**: It supports filtering incoming data based on expected sensor names, versions, and parameters, ensuring that only relevant data triggers behaviors.
+- **Preprocessing**: The module can utilize a list of preprocessors (`Preprocessors`) to transform data before it is processed further.
+- **Sensor Behaviors Invocation**: Upon receiving new sensor data, it calls the appropriate behaviors (`SensorBehaviors`) to handle the data, allowing for extensible application logic.
+- **Error Behaviors Invocation**: The class maintains a list of error behaviors (`ErrorBehaviors`) that are invoked when errors occur during data processing.
 
-### Sensor Data
+It implements the `IDisposable` interface to allow for efficient resource release upon program termination (must be called!).
+A `NithModule` can receive data from multiple sources. For this reason, it implements the `IPortListener` interface, which allow it to be added as a listener to various types of port listeners and data receivers.
 
-Sensor data is managed through the `NithSensorData` object, which includes:
-- The original raw data string.
-- Metadata such as sensor name, version, and status code.
-- A list of parameter values, each represented by an `INithParameterValue` structure. This structure provides not only the base and maximum values for each parameter but also a normalized value (ranging from 0 to 1) when applicable.
-- Utility methods like `GetParameterValue()` and `ContainsParameter()` which assist in accessing and verifying the presence of specific data parameters.
+The library allows to define multiple NithModules, to manage multiple sensors at the same time.
 
-### Sensor Behaviors
+### Ports
+The `Ports` namespace includes modules designed to listen for data from USB and UDP ports. Those can send data to other components (most importantly to one - or more than one - `NITHModule`).
 
-Implemented via the `INithSensorBehavior` interface, sensor behaviors define how incoming sensor data is processed. Developers can tailor these behaviors by:
+- **UDP Reception**: The UDP receiver is responsible for listening for incoming UDP packets on a specified port. It uses asynchronous programming to handle data reception efficiently, allowing for real-time data processing. When data is received, the UDP receiver notifies registered listeners by passing the received data to them, ensuring that the information can be processed or acted upon as needed. This implementation supports broadcast messaging, making it suitable for scenarios where multiple receivers may need to receive the same data.
+
+- **USB Reception**: The USB receiver handles serial communication over a specified USB port. It manages the connection lifecycle, including connecting, disconnecting, and reading data from the serial port. The USB receiver also incorporates a timeout mechanism to disconnect if no data is received within a specified duration. Upon receiving data, it transfers the information to registered listeners for further processing. This allows for seamless integration of USB-based devices into the application, enabling data exchange and control.
+
+They both implement the `IDisposable` interface to allow the implementation of resource release mechanisms after program termination.
+
+### Preprocessors
+The `Preprocessors` package provides interfaces and implementations for modifying incoming sensor data before it is processed by behaviors. The core interface, `INithPreprocessor`, defines a method to transform `NithSensorData`, allowing for various preprocessing operations, user defined. The package includes two examples: 
+- `NithPreprocessor_HeadTrackerCalibrator`, which calibrates head tracker data by adjusting incoming values to a defined center position
+- `NithPreprocessor_MAfilterParams`, which applies a moving average exponential decaying filter to specified parameters. 
+
+They can then be added to the specific list in `NithModule`. The order in which preprocessors are added to the `NithModule` determines the sequence of their operations.
+
+### Internals
+
+The `Internals` package of the NITHlibrary contains essential interfaces, enums, and data structures that facilitate the operation of the NITH framework.
+
+#### Behavior Interfaces
+
+The package defines two primary interfaces for behavior handling.
+
+**INithSensorBehavior**: This interface defines a template for a behavior that reacts to incoming sensor data (i.e. `NithSensorData`). Classes implementing this interface must provide an implementation for the `HandleData` method.
+
+Developers can tailor these behaviors by:
 - Specifying a list of expected parameters that the behavior can handle.
 - Using runtime checks within the behavior’s `HandleData` method to verify the presence of these parameters.
 - Extracting and processing parameter values to drive application logic.
 
-A range of behaviors can be implemented, allowing for dynamic and flexible handling of various sensor events.
+**INithErrorBehavior**: This interface specifies how to manage errors within the system. Implementing classes must define the `HandleError` method, which takes an `NithErrors` enum value and returns a boolean indicating whether the error was handled.
 
-### Error Behaviors
+Possible error types include:
+- Connection Issues
+- Protocol Non-compliance
+- Unexpected Sensor Names or Versions
+- Missing Parameters
 
-Error behaviors, defined by the `INithErrorBehavior` interface, manage different types of errors that may occur during sensor data acquisition or parsing. Possible error types include:
-- **Connection Issues**
-- **Protocol Non-compliance**
-- **Unexpected Sensor Names or Versions**
-- **Missing Parameters**
+Behaviors implementing these classes can then be added to the lists of behaviors contained in a `NithModule`.
 
-By handling these errors through dedicated behaviors, developers can provide appropriate responses or notifications when problems occur.
+#### Enums
+Several enums are defined to represent various states and parameters:
 
-### Preprocessors
+- **NithErrors**: This enum enumerates possible errors that can occur within the `NithModule`, including connection issues, compliance errors, and parameter-related errors.
 
-Preprocessors (via the `INithPreprocessor` interface) prepare sensor data prior to its consumption by behaviors. They can modify the `NithSensorData` object by filtering or transforming its list of parameters. The order in which preprocessors are added determines the sequence of their operations, allowing for systematic data adjustments such as calibration or noise filtering.
+- **NithParameters**: This enum lists the parameters that can be output by a NITH sensor, covering aspects related to the eyes, mouth, head, and system calibration. Each entry represents a specific parameter that can be monitored.
 
-The following Preprocessors are included in the library and serve as an example.
+- **NithStatusCodes**: This enum represents various status codes received from a NITH sensor, indicating operational status, errors, or calibration needs.
 
-#### NithPreprocessor_HeadTrackerCalibrator
+#### Data Types
+- **NithSensorData**:  This class encapsulates data received from NITH sensors. This includes:
+  - The original raw data string.
+  - Metadata such as sensor name, version, and status code.
+  - A list of parameter values, each represented by a `NithParameterValue` structure. This structure provides not only the base and maximum values for each parameter but also a normalized value (ranging from 0 to 1) when applicable.
+  - Utility methods like `ContainsParameter()` which assist in accessing and verifying the presence of specific data parameters.
+  - Lastly, and more importantly, the `GetParameterValue()` method allows to get the parsed value of a parameter, returning a `NithParameterValue` struct.
 
-The `NithPreprocessor_HeadTrackerCalibrator` is designed to facilitate the calibration of head tracker data. It is specifically tailored for head trackers that detect head rotation across three axes: yaw, pitch, and roll.
+- **NithParameterValue**: This struct represents the value of a specific NITH sensor parameter. It includes: 
+  - The `Base` value, which represents the unfiltered parameter value
+  - The `Max` value, not always present, which represents the ceiling, the maximum value that the base can assume
+  - If both Base and Max are present, the `Normalized` value will be a normalized percentage of the Base over the Max (from 0 to 100)
+  - Normally the data are in `string` format. If they are numeric and can be parsed to double, you can retrieve them usin the -AsDouble methods.
 
-- **Calibration**: This preprocessor enables users to establish a center position, allowing for the calibration of incoming data to that center through angular transformations. This ensures that the head movement data is accurate and centered.
+### Port Detector
+The `PortDetector` package in the NITHlibrary is designed to faciltate and automate the detection of NITH sensors connected to USB ports. It includes the `NithUSBportDetector` class, which manages the scanning process of USB ports for connected sensors.
 
-#### NithPreprocessor_MAfilterParams
+This class utilizes the `INithUSBportDetectorBehavior` interface to allow for customizable behavior during the detection phases, such as connecting to a specific sensor or handling error scenarios.
 
-The `NithPreprocessor_MAfilterParams` implements an exponentially decaying moving average filter for filtering specified parameters. This preprocessor is useful for smoothing out noisy data.
+The `NithPortDetectorStatus` enum is used to represent the various states of the detection process, including idle, scanning, finished, and error. The scanning process involves opening each USB port, listening for incoming data that matches a specific pattern, and recording any detected sensors.
 
-- **Filtering**: Parameters to be filtered are defined in a list provided during the instantiation of the preprocessor. The filter applies an exponential decay to the data, reducing noise and providing a smoother signal.
+- [ ] Future work will be focused on making the automatic connection process more efficient
 
-#### NithPreprocessor_WebcamWrapper
+### Wrappers
 
-The `NithPreprocessor_WebcamWrapper` is specifically designed for use with the `NITHfacecamWrapper`. It performs several functions related to eye and mouth aperture detection.
+The `Wrappers` package contains classes and tools to support the interaction with __NITHwrappers__, which are basically pieces of software that "turn into a NITHsensor" a commercially available sensor (e.g. a webcam, or an eye tracker).
 
-- **Calibration**: Calibrates eye and mouth apertures, taking into account the user's maximum and minimum aperture levels. This ensures that the aperture values are normalized to a range from 0 to 1.
+- The `NithWebcamWrapper` subpackage in the NITHlibrary is designed to preprocess data from [NITHwebcamWrapper](https://github.com/LIMUNIMI/NITHwebcamWrapper), specifically for calibrating and normalizing values related to eye and mouth apertures. It supports both automatic continuous calibration, which updates minimum and maximum values based on incoming data, and manual calibration modes, where users set these values themselves.
 
-- **Boolean Extraction**: Extracts boolean values for eye and mouth apertures, indicating whether the aperture exceeds a specified threshold. This is useful for detecting open/closed states.
+- [ ] The Wrappers package will be updated in the future with more packages to support more wrappers.
+
+### BehaviorTemplates
+The `BehaviorTemplates` package provides some abstract classes intended as templates for implementing specific sensor behaviors in response to specific scenarios or data conditions. 
+
+- `ANithBlinkEventBehavior` offers a structured way to handle eye blink events by tracking the state of the eyes and triggering actions based on defined thresholds for eye closure and opening.
+- `ANithErrorToStringBehavior` generates standardized error messages for various NITH errors, in string format. 
+- `ANithParametersStringBehavior` converts sensor parameters into a comfortably readable multi-line string format, facilitating easier output in graphical user interfaces. 
+
+These abstract classes are designed to be extended, enabling developers to create customized behaviors that fit specific application needs.
 
 ### Additional Tools
 
-The library also includes various utility tools organized in distinct namespaces:
-- **Filters**: Provide functions for data smoothing (e.g., moving average filters).
-- **Mappers**: Assist in transforming numerical data, such as remapping a sensor’s output range.
-- **Other Utilities**: These may include helpers for tasks like angle conversions or calculating velocity from sensor readings.
+The library also includes various utility tools organized in distinct namespaces.
 
-Overall, NITHlibrary abstracts sensor communication and data processing with a modular, behavior-driven architecture. This design not only promotes flexibility and ease of integration but also enables developers to rapidly prototype and extend accessible applications for users with specialized needs.
-  
+#### Filters
+The `Filters` namespace in the NITHlibrary provides a set of filtering mechanisms designed to process arrays and individual double values. It includes interfaces and implementations for various types of filters, such as moving average filters, exponentially decaying filters, and others. These filters are useful for smoothing data, reducing noise, and applying different weighting techniques to enhance the quality and stability of sensor readings. Filters include facilities for smooth single value inputs, points, and arrays.
+
+#### Logging
+
+The `Logging` namespace provides an error logging mechanism for GUI applications, addressing the lack of built-in logging facilities of some frameworks (e.g. WPF). It includes services for logging exceptions to a dedicated log file located in a "Logs" directory within the application's base directory, and it formats log entries to include relevant details such as exception messages and stack traces.
+
+#### Mappers
+The `Mappers` namespace provides tools for transforming and remapping sensor data. It includes various components designed for specific mapping tasks:
+
+- **AngleBaseChanger**: This component is useful to perform transformations on angular data, specifically to "specify the zero" in a 3D polar coordinates system. This can be useful for example to specify the center when using a headtracker.
+
+- **SegmentMapper**: This class facilitates the mapping of input values from one range to another (i.e. domain change), making it useful for normalizing data and ensuring consistent value representation across different scales.
+
+- **Velocity Calculators**: The namespace features multiple implementations of velocity calculators, which can transform spatial samples into velocity data (i.e. discrete derivative). The various implementations are based on different methods, e.g. kalman filtering, adaptive kalman, or simple step detection with smoothing. These calculators are designed to estimate velocity measurements accurately, catering to different application requirements.
