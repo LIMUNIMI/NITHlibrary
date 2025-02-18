@@ -25,7 +25,7 @@ Modules generally receive data in some manner. Most "modules" in the NITH framew
 NITHlibrary is built using C# within __Microsoft Visual Studio__. We recommend using the same for an optimal development experience.
 In order to use NITHlibrary you can simply clone this repo, place its folder next to your project folder and add a reference to it within your project (and/or add it to your __Solution__ in __Visual Studio__).
 
-- [ ] Precompiled DLLs will be available soon.
+- [ ] Precompiled DLLs will be available in the future.
 
 ## Contents Overview
 
