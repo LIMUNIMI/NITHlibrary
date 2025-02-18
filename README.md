@@ -156,3 +156,19 @@ The `Mappers` namespace provides tools for transforming and remapping sensor dat
 - **SegmentMapper**: This class facilitates the mapping of input values from one range to another (i.e. domain change), making it useful for normalizing data and ensuring consistent value representation across different scales.
 
 - **Velocity Calculators**: The namespace features multiple implementations of velocity calculators, which can transform spatial samples into velocity data (i.e. discrete derivative). The various implementations are based on different methods, e.g. kalman filtering, adaptive kalman, or simple step detection with smoothing. These calculators are designed to estimate velocity measurements accurately, catering to different application requirements.
+
+## How to contribute to the development
+
+NITHlibrary is written in C# and can be opened with Visual Studio or another IDE/editor using the provided *.sln* solution file.
+
+To contribute to the development of NITHtester, follow these steps:
+
+1. Clone this repository to your local machine.
+2. Open the *NITHlibrary.sln* solution file with Visual Studio.
+3. Make your desired changes or additions to the code.
+
+Feel free to fork this repository!
+
+## License
+
+This project is licensed under the [GNU GPLv3 license](https://www.gnu.org/licenses/gpl-3.0.en.html).
