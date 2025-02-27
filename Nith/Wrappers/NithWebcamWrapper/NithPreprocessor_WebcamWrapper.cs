@@ -253,9 +253,9 @@ namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
 
                 // Modify aperture values to include ranges =====
                 // Remove old args
-                sensorData.Values.RemoveAll(x => x.Parameter == NithParameters.eyeLeft_ape);
-                sensorData.Values.RemoveAll(x => x.Parameter == NithParameters.eyeRight_ape);
-                sensorData.Values.RemoveAll(x => x.Parameter == NithParameters.mouth_ape);
+                sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == NithParameters.eyeLeft_ape));
+                sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == NithParameters.eyeRight_ape));
+                sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == NithParameters.mouth_ape));
 
                 // Insert new args
                 // Insert Open/Close eyes and mouth

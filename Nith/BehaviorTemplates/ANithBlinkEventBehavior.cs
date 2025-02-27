@@ -1,6 +1,6 @@
 ﻿using NITHlibrary.Nith.Internals;
 
-namespace NITHlibrary.Nith.Behaviors
+namespace NITHlibrary.Nith.BehaviorTemplates
 {
     /// <summary>
     /// Defines a blink event behavior. This is a metabehavior which defines a more comfortable way to trigger events on eye closure/aperture events.

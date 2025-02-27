@@ -2,7 +2,7 @@
 using NITHlibrary.Nith.Internals;
 using NITHlibrary.Nith.Module;
 
-namespace NITHlibrary.Nith.Behaviors
+namespace NITHlibrary.Nith.BehaviorTemplates
 {
     /// <summary>
     /// A metabehavior which creates a standard string for each of the possible NITH errors.

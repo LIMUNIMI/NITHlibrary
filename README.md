@@ -7,6 +7,8 @@ _A C# Library for Interfacing NITH Sensor Peripherals and Wrappers_
 </div>
 <br/>
 
+## Overview
+
 NITHlibrary is the main component of the NITH framework, a framework for developing accessible software and tools dedicated to individuals with tetraplegia.
 
 It's **Written in C# .NET Core 8** Ensuring cross-platform compatibility with Windows, Linux, and macOS.
@@ -60,6 +62,8 @@ They both implement the `IDisposable` interface to allow the implementation of r
 The `Preprocessors` package provides interfaces and implementations for modifying incoming sensor data before it is processed by behaviors. The core interface, `INithPreprocessor`, defines a method to transform `NithSensorData`, allowing for various preprocessing operations, user defined. The package includes two examples: 
 - `NithPreprocessor_HeadTrackerCalibrator`, which calibrates head tracker data by adjusting incoming values to a defined center position
 - `NithPreprocessor_MAfilterParams`, which applies a moving average exponential decaying filter to specified parameters. 
+
+
 
 They can then be added to the specific list in `NithModule`. The order in which preprocessors are added to the `NithModule` determines the sequence of their operations.
 
@@ -124,11 +128,11 @@ The `NithPortDetectorStatus` enum is used to represent the various states of the
 
 The `Wrappers` package contains classes and tools to support the interaction with __NITHwrappers__, which are basically pieces of software that "turn into a NITHsensor" a commercially available sensor (e.g. a webcam, or an eye tracker).
 
-- The `NithWebcamWrapper` subpackage in the NITHlibrary is designed to preprocess data from [NITHwebcamWrapper](https://github.com/LIMUNIMI/NITHwebcamWrapper), specifically for calibrating and normalizing values related to eye and mouth apertures. It supports both automatic continuous calibration, which updates minimum and maximum values based on incoming data, and manual calibration modes, where users set these values themselves.
+- The `NithWebcamWrapper` subpackage in the NITHlibrary is contains a preproccessor (`NITHpreprocessor_WebcamWrapper_`) able to preprocess data from [NITHwebcamWrapper](https://github.com/LIMUNIMI/NITHwebcamWrapper), specifically for calibrating and normalizing values related to eye and mouth apertures. It supports both automatic continuous calibration, which updates minimum and maximum values based on incoming data, and manual calibration modes, where users set these values themselves.
 
 - [ ] The Wrappers package will be updated in the future with more packages to support more wrappers.
 
-### BehaviorTemplates
+### Behavior Templates
 The `BehaviorTemplates` package provides some abstract classes intended as templates for implementing specific sensor behaviors in response to specific scenarios or data conditions. 
 
 - `ANithBlinkEventBehavior` offers a structured way to handle eye blink events by tracking the state of the eyes and triggering actions based on defined thresholds for eye closure and opening.
