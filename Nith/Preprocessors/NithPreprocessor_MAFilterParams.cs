@@ -45,7 +45,7 @@ namespace NITHlibrary.Nith.Preprocessors
                     // Getting value and removing from data
                     var backup = sensorData.GetParameterValue(param).Value;
                     sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == param));
-                    var baseVal = backup.BaseAsDouble;
+                    var baseVal = backup.ValueAsDouble;
 
                     // Filtering
                     _filtersArray[i].Push(baseVal);
@@ -54,9 +54,9 @@ namespace NITHlibrary.Nith.Preprocessors
                     // Making the new value
                     sensorData.Values.Add(new()
                     {
-                        Type = backup.Type,
+                        DataType = backup.DataType,
                         Parameter = param,
-                        Base = filteredBaseVal.ToString("F5"),
+                        Value = filteredBaseVal.ToString("F5"),
                         Max = backup.Max
                     });
                 }

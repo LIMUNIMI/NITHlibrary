@@ -6,26 +6,57 @@ namespace NITHlibrary.Tools.Ports
     /// <summary>
     /// Provides functionality to send messages via UDP.
     /// </summary>
-    public class UDPsender : IDisposable
+    public class UDPsender : IDisposable, IPortSender
     {
         /// <summary>
         /// Gets or sets the port number to send UDP messages to.
         /// </summary>
         public int Port { get; set; }
+
+        /// <summary>
+        /// Gets or sets the IP address to send UDP messages to.
+        /// </summary>
+        public string IpAddress { get; set; }
+
         private UdpClient _client;
-        private readonly IPEndPoint _endPoint;
+        private IPEndPoint _endPoint;
 
         private bool _disposedValue = false; // To detect redundant calls
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="UDPsender"/> class with the specified port.
+        /// Initializes a new instance of the <see cref="UDPsender"/> class with the specified port
+        /// and optional IP address (defaults to broadcast if not specified).
         /// </summary>
         /// <param name="port">The port number to send UDP messages to.</param>
-        public UDPsender(int port)
+        /// <param name="ipAddress">The IP address to send UDP messages to. If null or empty, broadcast will be used.</param>
+        public UDPsender(int port, string ipAddress = null)
         {
             Port = port;
             _client = new();
-            _endPoint = new(IPAddress.Broadcast, Port);
+            SetIpAddress(ipAddress);
+        }
+
+        /// <summary>
+        /// Sets the IP address to send UDP messages to.
+        /// </summary>
+        /// <param name="ipAddress">The IP address as a string. If null or empty, broadcast will be used.</param>
+        /// <returns>True if the IP address was set successfully, false otherwise.</returns>
+        public bool SetIpAddress(string ipAddress)
+        {
+            try
+            {
+                IpAddress = string.IsNullOrWhiteSpace(ipAddress) ? "255.255.255.255" : ipAddress;
+                var ip = string.IsNullOrWhiteSpace(ipAddress) ? IPAddress.Broadcast : IPAddress.Parse(ipAddress);
+                _endPoint = new(ip, Port);
+                return true;
+            }
+            catch
+            {
+                // In case of invalid IP address, fall back to broadcast
+                IpAddress = "255.255.255.255";
+                _endPoint = new(IPAddress.Broadcast, Port);
+                return false;
+            }
         }
 
         /// <summary>

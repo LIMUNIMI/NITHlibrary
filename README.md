@@ -1,6 +1,6 @@
 # NITHlibrary
 
-_A C# Library for Hands-Free Accessible Applications Development throgh the NITH Sensor Peripherals and Wrappers_
+_A C# Library for Hands-Free Accessible Applications Development through the NITH Sensor Peripherals and Wrappers_
 
 <div align="center">
   <img src="NithLogo_Black_Trace.png" alt="NITH logo." width="150px"/>

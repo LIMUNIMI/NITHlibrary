@@ -261,6 +261,21 @@
         head_acc_roll,
 
         /// <summary>
+        /// Gyroscopic head rotation (yaw axis velocity)
+        /// </summary>
+        head_vel_yaw,
+
+        /// <summary>
+        /// Gyroscopic head rotation (pitch axis velocity)
+        /// </summary>
+        head_vel_pitch,
+
+        /// <summary>
+        /// Gyroscopic head rotation (roll axis velocity)
+        /// </summary>
+        head_vel_roll,
+
+        /// <summary>
         /// Neck muscles tension
         /// </summary>
         neck_tension,

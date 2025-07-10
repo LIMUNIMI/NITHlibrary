@@ -78,21 +78,21 @@ namespace NITHlibrary.Nith.Preprocessors
                 // Add calibrated values
                 sensorData.Values.Add(new()
                 {
-                    Type = NithDataTypes.OnlyBase,
+                    DataType = NithDataTypes.OnlyValue,
                     Parameter = NithParameters.head_pos_yaw,
-                    Base = CenteredPosition.Yaw.ToString(NumberFormat, CultureInfo.InvariantCulture),
+                    Value = CenteredPosition.Yaw.ToString(NumberFormat, CultureInfo.InvariantCulture),
                 });
                 sensorData.Values.Add(new()
                 {
-                    Type = NithDataTypes.OnlyBase,
+                    DataType = NithDataTypes.OnlyValue,
                     Parameter = NithParameters.head_pos_pitch,
-                    Base = CenteredPosition.Pitch.ToString(NumberFormat, CultureInfo.InvariantCulture),
+                    Value = CenteredPosition.Pitch.ToString(NumberFormat, CultureInfo.InvariantCulture),
                 });
                 sensorData.Values.Add(new()
                 {
-                    Type = NithDataTypes.OnlyBase,
+                    DataType = NithDataTypes.OnlyValue,
                     Parameter = NithParameters.head_pos_roll,
-                    Base = CenteredPosition.Roll.ToString(NumberFormat, CultureInfo.InvariantCulture),
+                    Value = CenteredPosition.Roll.ToString(NumberFormat, CultureInfo.InvariantCulture),
                 });
             }
             return sensorData;
@@ -107,9 +107,9 @@ namespace NITHlibrary.Nith.Preprocessors
             {
                 switch (arg.Parameter)
                 {
-                    case NithParameters.head_pos_yaw: posY = arg.BaseAsDouble; break;
-                    case NithParameters.head_pos_pitch: posP = arg.BaseAsDouble; break;
-                    case NithParameters.head_pos_roll: posR = arg.BaseAsDouble; break;
+                    case NithParameters.head_pos_yaw: posY = arg.ValueAsDouble; break;
+                    case NithParameters.head_pos_pitch: posP = arg.ValueAsDouble; break;
+                    case NithParameters.head_pos_roll: posR = arg.ValueAsDouble; break;
                     default: break;
                 }
             }

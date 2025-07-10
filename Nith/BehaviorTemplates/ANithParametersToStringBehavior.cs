@@ -5,7 +5,7 @@ namespace NITHlibrary.Nith.BehaviorTemplates
     /// <summary>
     /// A metabehavior which converts NITH parameters into a string that is comfortable to read (e.g., in console output or in a TextBox).
     /// </summary>
-    public abstract class ANithParametersStringBehavior : INithSensorBehavior
+    public abstract class ANithParametersToStringBehavior : INithSensorBehavior
     {
         private const int MinArgLength = 15;
         private string _argumentStr = "";
@@ -21,13 +21,13 @@ namespace NITHlibrary.Nith.BehaviorTemplates
             {
                 _argumentStr += AddWhiteSpaces(val.Parameter.ToString());
                 _argumentStr += "v: ";
-                if (val.Type == NithDataTypes.OnlyBase)
+                if (val.DataType == NithDataTypes.OnlyValue)
                 {
-                    _argumentStr += val.Base;
+                    _argumentStr += val.Value;
                 }
-                else if (val.Type == NithDataTypes.BaseAndMax)
+                else if (val.DataType == NithDataTypes.Range)
                 {
-                    _argumentStr += val.Base + " / " + val.Max + "\tp: " + val.Normalized.ToString("F2");
+                    _argumentStr += val.Min + "/" + val.Value + "/" + val.Max + "\tp: " + val.Normalized.ToString("F2");
                 }
 
                 _argumentStr += "\n";

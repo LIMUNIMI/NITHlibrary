@@ -40,8 +40,8 @@ namespace NITHlibrary.Nith.BehaviorTemplates
         {
             if (nithData.ContainsParameters(_requiredArguments))
             {
-                var isLEopen = bool.Parse(nithData.GetParameterValue(NithParameters.eyeLeft_isOpen).Value.Base);
-                var isREopen = bool.Parse(nithData.GetParameterValue(NithParameters.eyeRight_isOpen).Value.Base);
+                var isLEopen = bool.Parse(nithData.GetParameterValue(NithParameters.eyeLeft_isOpen).Value.Value);
+                var isREopen = bool.Parse(nithData.GetParameterValue(NithParameters.eyeRight_isOpen).Value.Value);
 
                 // Update counters based on the state of the eyes
                 if (!isLEopen && isREopen) // Left eye is blinking
