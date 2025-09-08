@@ -132,6 +132,16 @@
         voice_pitch,
 
         /// <summary>
+        /// Voice pitch (note in standard notation. Sharps are preceded by a s)
+        /// </summary>
+        voice_note,
+
+        /// <summary>
+        /// Voice pitch offset in cents from the closest note (implying the voice_note parameter)
+        /// </summary>
+        voice_offset,
+
+        /// <summary>
         /// Voice intensity (volume)
         /// </summary>
         voice_intensity,
