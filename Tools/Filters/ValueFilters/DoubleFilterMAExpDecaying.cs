@@ -9,6 +9,7 @@
         private double _valI;
         private double _valIplusOne;
         private readonly float _alpha;
+        private bool _isInitialized = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DoubleFilterMAexpDecaying"/> class.
@@ -27,6 +28,16 @@
         public void Push(double val)
         {
             if (double.IsNaN(val)) return;
+            
+            // Initialize the filter with the first value to avoid transient spikes
+            if (!_isInitialized)
+            {
+                _valI = val;
+                _valIplusOne = val;
+                _isInitialized = true;
+                return;
+            }
+            
             _valI = _valIplusOne;
             _valIplusOne = _alpha * val + (1 - _alpha) * _valI;
         }

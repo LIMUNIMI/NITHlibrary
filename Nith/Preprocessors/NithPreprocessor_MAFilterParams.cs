@@ -1,6 +1,7 @@
 ﻿using NITHlibrary.Nith.Internals;
 using NITHlibrary.Nith.Module;
 using NITHlibrary.Tools.Filters.ValueFilters;
+using System.Globalization;
 
 namespace NITHlibrary.Nith.Preprocessors
 {
@@ -12,6 +13,7 @@ namespace NITHlibrary.Nith.Preprocessors
     {
         private readonly List<DoubleFilterMAexpDecaying> _filtersArray;
         private readonly List<NithParameters> _paramsArray;
+        private const string NumberFormat = "0.00000";
 
         /// <summary>
         /// Initializes a new instance of the <see cref="NithPreprocessor_MAfilterParams"/> class.
@@ -43,7 +45,11 @@ namespace NITHlibrary.Nith.Preprocessors
                 if (sensorData.ContainsParameter(param))
                 {
                     // Getting value and removing from data
-                    var backup = sensorData.GetParameterValue(param).Value;
+                    var backupValue = sensorData.GetParameterValue(param);
+                    if (!backupValue.HasValue)
+                        continue;
+
+                    var backup = backupValue.Value;
                     sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == param));
                     var baseVal = backup.ValueAsDouble;
 
@@ -51,14 +57,31 @@ namespace NITHlibrary.Nith.Preprocessors
                     _filtersArray[i].Push(baseVal);
                     var filteredBaseVal = _filtersArray[i].Pull();
 
-                    // Making the new value
-                    sensorData.Values.Add(new()
+                    // Making the new value - preserve Min/Max for Range type parameters
+                    if (backup.DataType == NithDataTypes.Range)
                     {
-                        DataType = backup.DataType,
-                        Parameter = param,
-                        Value = filteredBaseVal.ToString("F5"),
-                        Max = backup.Max
-                    });
+                        // For Range type, create with Min, Value, Max
+                        sensorData.Values.Add(new()
+                        {
+                            DataType = NithDataTypes.Range,
+                            Parameter = param,
+                            Min = backup.Min,
+                            Value = filteredBaseVal.ToString(NumberFormat, CultureInfo.InvariantCulture),
+                            Max = backup.Max
+                        });
+                    }
+                    else
+                    {
+                        // For OnlyValue type, create simple value
+                        sensorData.Values.Add(new()
+                        {
+                            DataType = NithDataTypes.OnlyValue,
+                            Parameter = param,
+                            Value = filteredBaseVal.ToString(NumberFormat, CultureInfo.InvariantCulture),
+                            Min = "",
+                            Max = ""
+                        });
+                    }
                 }
             }
 

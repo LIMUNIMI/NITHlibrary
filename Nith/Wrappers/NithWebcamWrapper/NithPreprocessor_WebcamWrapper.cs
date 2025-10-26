@@ -12,7 +12,6 @@ namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
     /// Does the following:
     /// - Eyes and mouth aperture calibration (taking into account the user's maximum and minimum aperture). Eyes and mouth aperture values will then be from 0 to 1 (and the Normalized value will become available)
     /// - Extracting the boolean values for mouth and eyes aperture (which simply state if the aperture is above a certain threshold)
-    /// - Calculates head acceleration values from position data if available
     /// </summary>
     public class NithPreprocessor_WebcamWrapper : INithPreprocessor
     {
@@ -41,7 +40,7 @@ namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
 
         private readonly List<string> _requiredSensorName = ["NITHwebcamWrapper"];
 
-        // Required sensor name ofr this preprocessor to intervene
+        // Required sensor name for this preprocessor to intervene
         private float _apertureLe = 0;
         private float _apertureMou = 0;
         private float _apertureRe = 0;
@@ -70,31 +69,6 @@ namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
         private float _thresholdMou = 0;
         private float _thresholdRe = 0;
 
-        // Velocity calculators per il calcolo dell'accelerazione
-        private readonly VelocityCalculatorBasic _yawVelocityCalculator = new VelocityCalculatorBasic(0.8);
-        private readonly VelocityCalculatorBasic _pitchVelocityCalculator = new VelocityCalculatorBasic(0.8);
-        private readonly VelocityCalculatorBasic _rollVelocityCalculator = new VelocityCalculatorBasic(0.8);
-
-        // Filtri per stabilizzare i valori di velocità
-        private readonly DoubleFilterMAexpDecaying _yawAccFilter = new DoubleFilterMAexpDecaying(0.3f);
-        private readonly DoubleFilterMAexpDecaying _pitchAccFilter = new DoubleFilterMAexpDecaying(0.3f);
-        private readonly DoubleFilterMAexpDecaying _rollAccFilter = new DoubleFilterMAexpDecaying(0.3f);
-
-        // Ultime posizioni rilevate
-        private double _lastYawPos = 0;
-        private double _lastPitchPos = 0;
-        private double _lastRollPos = 0;
-
-        // Timestamp e intervallo di campionamento
-        private DateTime _lastFrameTime = DateTime.MinValue;
-        private const float DefaultDeltaTime = 1f / 30f;
-
-        // Fattore di sensibilità per le accelerazioni
-        private const float AccelerationSensitivity = 0.2f;
-
-        // Formato numerico per i valori di accelerazione
-        private const string AccelerationNumberFormat = "0.00000";
-
         /// <summary>
         /// Creates a new instance of the <see cref="NithPreprocessor_WebcamWrapper"/> class.
         /// </summary>
@@ -115,7 +89,7 @@ namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
         public NithWebcamCalibrationModes CalibrationMode { get; set; }
 
         /// <summary>
-        /// Specifies if a double threshold should be applied for the detecton of eye blinks (usually more robust).
+        /// Specifies if a double threshold should be applied for the detection of eye blinks (usually more robust).
         /// </summary>
         public bool DoubleThreshBlinks { get; set; }
 
@@ -251,9 +225,7 @@ namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
                     }
                 }
 
-                // Add Nith data and modify existing =====
-
-                // Modify aperture values to include ranges =====
+                // Modify aperture values to include ranges
                 // Remove old args
                 sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == NithParameters.eyeLeft_ape));
                 sensorData.Values.Remove(sensorData.Values.Find(x => x.Parameter == NithParameters.eyeRight_ape));
@@ -283,97 +255,9 @@ namespace NITHlibrary.Nith.Wrappers.NithWebcamWrapper
                 sensorData.Values.Add(new(NithParameters.eyeLeft_ape, "0", _apertureLe.ToString("0.00", CultureInfo.InvariantCulture), "100"));
                 sensorData.Values.Add(new(NithParameters.eyeRight_ape, "0", _apertureRe.ToString("0.00", CultureInfo.InvariantCulture), "100"));
                 sensorData.Values.Add(new(NithParameters.mouth_ape, "0", _apertureMou.ToString("0.00", CultureInfo.InvariantCulture), "100"));
-
-                // Calcola le accelerazioni se sono disponibili i dati di posizione della testa ma non già i dati di accelerazione
-                if ((sensorData.ContainsParameter(NithParameters.head_pos_yaw) ||
-                    sensorData.ContainsParameter(NithParameters.head_pos_pitch) ||
-                    sensorData.ContainsParameter(NithParameters.head_pos_roll)) &&
-                    (!sensorData.ContainsParameter(NithParameters.head_vel_yaw) ||
-                    !sensorData.ContainsParameter(NithParameters.head_vel_pitch) ||
-                    !sensorData.ContainsParameter(NithParameters.head_vel_roll)))
-                {
-                    // Calcola le accelerazioni per ciascun asse se è disponibile il dato di posizione
-                    if (sensorData.ContainsParameter(NithParameters.head_pos_yaw) &&
-                        !sensorData.ContainsParameter(NithParameters.head_vel_yaw))
-                    {
-                        double yawPos = sensorData.GetParameterValue(NithParameters.head_pos_yaw).Value.ValueAsDouble;
-
-                        // Calcola velocità usando VelocityCalculatorBasic
-                        _yawVelocityCalculator.Push(yawPos);
-                        double yawVelocity = _yawVelocityCalculator.PullInstantSpeed() *
-                                           Math.Sign(_yawVelocityCalculator.PullDirection());
-
-                        // Filtra l'accelerazione per ridurre il rumore
-                        _yawAccFilter.Push(yawVelocity * AccelerationSensitivity);
-                        double filteredYawAcc = _yawAccFilter.Pull();
-
-                        // Aggiungi il valore di accelerazione calcolato
-                        sensorData.Values.Add(new()
-                        {
-                            DataType = NithDataTypes.OnlyValue,
-                            Parameter = NithParameters.head_vel_yaw,
-                            Value = filteredYawAcc.ToString(AccelerationNumberFormat, CultureInfo.InvariantCulture),
-                        });
-
-                        // Salva la posizione attuale per il prossimo calcolo
-                        _lastYawPos = yawPos;
-                    }
-
-                    if (sensorData.ContainsParameter(NithParameters.head_pos_pitch) &&
-                        !sensorData.ContainsParameter(NithParameters.head_vel_pitch))
-                    {
-                        double pitchPos = sensorData.GetParameterValue(NithParameters.head_pos_pitch).Value.ValueAsDouble;
-
-                        // Calcola velocità usando VelocityCalculatorBasic
-                        _pitchVelocityCalculator.Push(pitchPos);
-                        double pitchVelocity = _pitchVelocityCalculator.PullInstantSpeed() *
-                                            Math.Sign(_pitchVelocityCalculator.PullDirection());
-
-                        // Filtra l'accelerazione per ridurre il rumore
-                        _pitchAccFilter.Push(pitchVelocity * AccelerationSensitivity);
-                        double filteredPitchAcc = _pitchAccFilter.Pull();
-
-                        // Aggiungi il valore di accelerazione calcolato
-                        sensorData.Values.Add(new()
-                        {
-                            DataType = NithDataTypes.OnlyValue,
-                            Parameter = NithParameters.head_vel_pitch,
-                            Value = filteredPitchAcc.ToString(AccelerationNumberFormat, CultureInfo.InvariantCulture),
-                        });
-
-                        // Salva la posizione attuale per il prossimo calcolo
-                        _lastPitchPos = pitchPos;
-                    }
-
-                    if (sensorData.ContainsParameter(NithParameters.head_pos_roll) &&
-                        !sensorData.ContainsParameter(NithParameters.head_vel_roll))
-                    {
-                        double rollPos = sensorData.GetParameterValue(NithParameters.head_pos_roll).Value.ValueAsDouble;
-
-                        // Calcola velocità usando VelocityCalculatorBasic
-                        _rollVelocityCalculator.Push(rollPos);
-                        double rollVelocity = _rollVelocityCalculator.PullInstantSpeed() *
-                                           Math.Sign(_rollVelocityCalculator.PullDirection());
-
-                        // Filtra l'accelerazione per ridurre il rumore
-                        _rollAccFilter.Push(rollVelocity * AccelerationSensitivity);
-                        double filteredRollAcc = _rollAccFilter.Pull();
-
-                        // Aggiungi il valore di accelerazione calcolato
-                        sensorData.Values.Add(new()
-                        {
-                            DataType = NithDataTypes.OnlyValue,
-                            Parameter = NithParameters.head_vel_roll,
-                            Value = filteredRollAcc.ToString(AccelerationNumberFormat, CultureInfo.InvariantCulture),
-                        });
-
-                        // Salva la posizione attuale per il prossimo calcolo
-                        _lastRollPos = rollPos;
-                    }
-                }
             }
 
-            // Return ==========
+            // Return transformed data
             return sensorData;
         }
     }
