@@ -1,4 +1,5 @@
 ﻿using NITHlibrary.Tools.Logging;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -19,6 +20,9 @@ namespace NITHlibrary.Tools.Ports
 
         private UdpClient _client;
         private int _port;
+        private long _lastSampleTicks = 0;
+        private long _minTicksBetweenSamples = 0;
+        private int _droppedSamplesCount = 0;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UDPreceiver"/> class with the specified port.
@@ -27,6 +31,7 @@ namespace NITHlibrary.Tools.Ports
         public UDPreceiver(int port = DefaultNithUdpPort)
         {
             this._port = port;
+            MaxSamplesPerSecond = 100; // Default rate limit
         }
 
         /// <summary>
@@ -54,11 +59,47 @@ namespace NITHlibrary.Tools.Ports
         }
 
         /// <summary>
+        /// Gets or sets the maximum number of samples per second to process.
+        /// Set to 0 for unlimited (no rate limiting).
+        /// Default is 100 samples/second.
+        /// </summary>
+        public int MaxSamplesPerSecond
+        {
+            get => _minTicksBetweenSamples == 0 ? 0 : (int)(Stopwatch.Frequency / _minTicksBetweenSamples);
+            set
+            {
+                if (value <= 0)
+                {
+                    _minTicksBetweenSamples = 0; // Unlimited
+                }
+                else
+                {
+                    _minTicksBetweenSamples = Stopwatch.Frequency / value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the total number of samples dropped due to rate limiting since connection.
+        /// </summary>
+        public int DroppedSamplesCount => _droppedSamplesCount;
+
+        /// <summary>
+        /// Resets the dropped samples counter.
+        /// </summary>
+        public void ResetDroppedSamplesCount()
+        {
+            _droppedSamplesCount = 0;
+        }
+
+        /// <summary>
         /// Connects the UDP receiver to the specified port.
         /// </summary>
         public void Connect()
         {
             IsConnected = InitializeUdp();
+            _lastSampleTicks = 0;
+            _droppedSamplesCount = 0;
         }
 
         /// <summary>
@@ -78,7 +119,7 @@ namespace NITHlibrary.Tools.Ports
         {
             _client?.Close();
             _client?.Dispose();
-            GC.SuppressFinalize(this); // Added this line to address CA1816
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
@@ -112,6 +153,22 @@ namespace NITHlibrary.Tools.Ports
         /// <param name="line">The data received from the UDP port.</param>
         private void NotifyListeners(string line)
         {
+            // Rate limiting: check if enough time has passed since last sample
+            if (_minTicksBetweenSamples > 0)
+            {
+                long currentTicks = Stopwatch.GetTimestamp();
+                long ticksSinceLastSample = currentTicks - _lastSampleTicks;
+
+                if (_lastSampleTicks != 0 && ticksSinceLastSample < _minTicksBetweenSamples)
+                {
+                    // Drop this sample - too fast
+                    _droppedSamplesCount++;
+                    return;
+                }
+
+                _lastSampleTicks = currentTicks;
+            }
+
             foreach (var listener in Listeners)
             {
                 listener.ReceivePortData(line);
@@ -136,7 +193,6 @@ namespace NITHlibrary.Tools.Ports
             catch (Exception e)
             {
                 LoggingService.Log(e);
-                // Decide if you want to stop on certain types of exceptions
             }
             finally
             {

@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 using NITHlibrary.Nith.Internals;
 using NITHlibrary.Nith.Preprocessors;
 using NITHlibrary.Tools.Ports;
@@ -13,12 +16,30 @@ namespace NITHlibrary.Nith.Module
     /// </summary>
     public class NithModule : IDisposable, IPortListener
     {
+        private readonly Channel<string> _dataChannel;
+        private readonly CancellationTokenSource _cancellationTokenSource;
+        private readonly Task _processingTask;
+        private readonly object _lastSensorDataLock = new();
+        private NithSensorData _lastSensorData = new();
+        private int _droppedSamplesCount = 0;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="NithModule"/> class.
         /// </summary>
         public NithModule()
         {
             LastError = NithErrors.NaE;
+            
+            // Initialize the channel for async processing
+            var channelOptions = new BoundedChannelOptions(MaxQueueSize)
+            {
+                FullMode = BoundedChannelFullMode.Wait // Will be updated based on OverflowBehavior
+            };
+            _dataChannel = Channel.CreateBounded<string>(channelOptions);
+            
+            // Start the background processing task
+            _cancellationTokenSource = new CancellationTokenSource();
+            _processingTask = Task.Run(() => ProcessDataAsync(_cancellationTokenSource.Token));
         }
 
         /// <summary>
@@ -51,8 +72,25 @@ namespace NITHlibrary.Nith.Module
 
         /// <summary>
         /// Gets the last sensor data received by the module.
+        /// Thread-safe property accessed via lock.
         /// </summary>
-        public NithSensorData LastSensorData { get; protected set; } = new();
+        public NithSensorData LastSensorData
+        {
+            get
+            {
+                lock (_lastSensorDataLock)
+                {
+                    return _lastSensorData;
+                }
+            }
+            protected set
+            {
+                lock (_lastSensorDataLock)
+                {
+                    _lastSensorData = value;
+                }
+            }
+        }
 
         /// <summary>
         /// Sensor behaviors are called each time sensor data is received.
@@ -65,10 +103,59 @@ namespace NITHlibrary.Nith.Module
         public List<INithPreprocessor?> Preprocessors { get; protected set; } = new();
 
         /// <summary>
+        /// Gets or sets the maximum queue size for incoming data.
+        /// Default is 50 samples. Larger values increase latency but reduce dropped samples.
+        /// </summary>
+        public int MaxQueueSize { get; set; } = 50;
+
+        /// <summary>
+        /// Gets or sets the behavior when the queue is full.
+        /// Default is DropOldest for real-time responsiveness.
+        /// </summary>
+        public QueueOverflowBehavior OverflowBehavior { get; set; } = QueueOverflowBehavior.DropOldest;
+
+        /// <summary>
+        /// Gets or sets whether to use asynchronous queue-based processing.
+        /// Default is true (opt-out). Set to false to use legacy synchronous processing.
+        /// </summary>
+        public bool UseAsyncProcessing { get; set; } = true;
+
+        /// <summary>
+        /// Gets the current number of samples waiting in the processing queue.
+        /// Useful for monitoring performance.
+        /// </summary>
+        public int QueueDepth => _dataChannel.Reader.Count;
+
+        /// <summary>
+        /// Gets the total number of samples dropped due to queue overflow.
+        /// </summary>
+        public int DroppedSamplesCount => _droppedSamplesCount;
+
+        /// <summary>
+        /// Resets the dropped samples counter.
+        /// </summary>
+        public void ResetDroppedSamplesCount()
+        {
+            Interlocked.Exchange(ref _droppedSamplesCount, 0);
+        }
+
+        /// <summary>
         /// Disposes the resources used by the <see cref="NithModule"/> class.
         /// </summary>
         public void Dispose()
         {
+            // Signal cancellation and wait for processing task to complete
+            _cancellationTokenSource.Cancel();
+            try
+            {
+                _processingTask.Wait(1000); // Wait up to 1 second
+            }
+            catch (AggregateException)
+            {
+                // Expected when task is cancelled
+            }
+
+            _cancellationTokenSource.Dispose();
             ErrorBehaviors.Clear();
             SensorBehaviors.Clear();
         }
@@ -78,6 +165,63 @@ namespace NITHlibrary.Nith.Module
         /// </summary>
         /// <param name="line">The raw data line received from the sensor.</param>
         void IPortListener.ReceivePortData(string line)
+        {
+            if (!UseAsyncProcessing)
+            {
+                // Legacy synchronous processing
+                ProcessDataSync(line);
+                return;
+            }
+
+            // Async queue-based processing
+            bool queued = false;
+
+            switch (OverflowBehavior)
+            {
+                case QueueOverflowBehavior.DropOldest:
+                    // Try to write, if full, remove oldest and try again
+                    while (!_dataChannel.Writer.TryWrite(line))
+                    {
+                        if (_dataChannel.Reader.TryRead(out _))
+                        {
+                            Interlocked.Increment(ref _droppedSamplesCount);
+                        }
+                    }
+                    queued = true;
+                    break;
+
+                case QueueOverflowBehavior.DropNewest:
+                    // Try to write, if full, drop this new sample
+                    queued = _dataChannel.Writer.TryWrite(line);
+                    if (!queued)
+                    {
+                        Interlocked.Increment(ref _droppedSamplesCount);
+                    }
+                    break;
+
+                case QueueOverflowBehavior.Block:
+                    // Block until space is available (may cause lag)
+                    _dataChannel.Writer.TryWrite(line);
+                    queued = true;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Background task that processes queued data asynchronously.
+        /// </summary>
+        private async Task ProcessDataAsync(CancellationToken cancellationToken)
+        {
+            await foreach (var line in _dataChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                ProcessDataSync(line);
+            }
+        }
+
+        /// <summary>
+        /// Synchronous data processing (used by both legacy mode and async worker).
+        /// </summary>
+        private void ProcessDataSync(string line)
         {
             NithSensorData data = new();
             var error = NithErrors.NaE;

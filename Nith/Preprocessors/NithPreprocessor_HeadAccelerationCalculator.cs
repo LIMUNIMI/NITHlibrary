@@ -1,4 +1,4 @@
-﻿using NITHlibrary.Nith.Internals;
+using NITHlibrary.Nith.Internals;
 using NITHlibrary.Nith.Module;
 using NITHlibrary.Tools.Filters.ValueFilters;
 using NITHlibrary.Tools.Mappers;
@@ -7,147 +7,147 @@ using System.Globalization;
 namespace NITHlibrary.Nith.Preprocessors
 {
     /// <summary>
-    /// Un preprocessore che calcola i dati di velocità della testa dai dati di posizione.
-    /// Se i dati di posizione della testa sono presenti ma quelli di velocità non lo sono, 
-    /// questo preprocessore li calcola e li aggiunge ai dati del sensore.
+    /// A preprocessor that calculates head acceleration data from velocity data.
+    /// If head velocity data is present but acceleration data is not,
+    /// this preprocessor calculates it and adds it to the sensor data.
     /// </summary>
-    public class NithPreprocessor_HeadVelocityCalculator : INithPreprocessor
+    public class NithPreprocessor_HeadAccelerationCalculator : INithPreprocessor
     {
-        // Calcolatori di velocità con timestamp
-        private readonly VelocityCalculatorTimestamped _yawVelocityCalculator;
-        private readonly VelocityCalculatorTimestamped _pitchVelocityCalculator;
-        private readonly VelocityCalculatorTimestamped _rollVelocityCalculator;
+        // Acceleration calculators with timestamp
+        private readonly VelocityCalculatorTimestamped _yawAccelerationCalculator;
+        private readonly VelocityCalculatorTimestamped _pitchAccelerationCalculator;
+        private readonly VelocityCalculatorTimestamped _rollAccelerationCalculator;
 
-        // Filtri per stabilizzare i valori di velocità
-        private readonly DoubleFilterMAexpDecaying _yawVelFilter;
-        private readonly DoubleFilterMAexpDecaying _pitchVelFilter;
-        private readonly DoubleFilterMAexpDecaying _rollVelFilter;
+        // Filters to stabilize acceleration values
+        private readonly DoubleFilterMAexpDecaying _yawAccFilter;
+        private readonly DoubleFilterMAexpDecaying _pitchAccFilter;
+        private readonly DoubleFilterMAexpDecaying _rollAccFilter;
 
-        // Ultime posizioni rilevate
-        private double _lastYawPos = 0;
-        private double _lastPitchPos = 0;
-        private double _lastRollPos = 0;
+        // Last velocities detected
+        private double _lastYawVel = 0;
+        private double _lastPitchVel = 0;
+        private double _lastRollVel = 0;
 
-        // Costanti per il calcolo della velocità
-        private readonly float _velocitySensitivity;
-        private const string VelocityNumberFormat = "0.00000";
+        // Constants for acceleration calculation
+        private readonly float _accelerationSensitivity;
+        private const string AccelerationNumberFormat = "0.00000";
 
         /// <summary>
-        /// Inizializza una nuova istanza della classe <see cref="NithPreprocessor_HeadVelocityCalculator"/>.
+        /// Initializes a new instance of the <see cref="NithPreprocessor_HeadAccelerationCalculator"/> class.
         /// </summary>
-        /// <param name="filterAlpha">Il fattore alpha per il filtro esponenziale a media mobile. 
-        /// Valori più alti rendono la risposta più rapida ma meno stabile. Default: 0.3.</param>
-        /// <param name="velocitySensitivity">Il fattore di sensibilità per le velocità. Default: 0.2.</param>
-        /// <param name="maxSamples">Il numero massimo di campioni da mantenere nella storia per il calcolo della velocità. Default: 3.</param>
-        /// <param name="maxSampleAgeMs">Il tempo massimo in millisecondi oltre il quale i campioni vengono considerati obsoleti. Default: 500.</param>
-        public NithPreprocessor_HeadVelocityCalculator(
+        /// <param name="filterAlpha">The alpha factor for the exponential moving average filter.
+        /// Higher values make the response faster but less stable. Default: 0.3.</param>
+        /// <param name="accelerationSensitivity">The sensitivity factor for accelerations. Default: 1.0.</param>
+        /// <param name="maxSamples">The maximum number of samples to keep in history for acceleration calculation. Default: 3.</param>
+        /// <param name="maxSampleAgeMs">The maximum time in milliseconds beyond which samples are considered obsolete. Default: 500.</param>
+        public NithPreprocessor_HeadAccelerationCalculator(
             float filterAlpha = 0.3f,
-            float velocitySensitivity = 0.2f,
+            float accelerationSensitivity = 1.0f,
             int maxSamples = 3,
             int maxSampleAgeMs = 500)
         {
-            _velocitySensitivity = velocitySensitivity;
+            _accelerationSensitivity = accelerationSensitivity;
 
-            // Inizializzazione dei filtri con il valore alpha configurabile
-            _yawVelFilter = new DoubleFilterMAexpDecaying(filterAlpha);
-            _pitchVelFilter = new DoubleFilterMAexpDecaying(filterAlpha);
-            _rollVelFilter = new DoubleFilterMAexpDecaying(filterAlpha);
+            // Initialize filters with the configurable alpha value
+            _yawAccFilter = new DoubleFilterMAexpDecaying(filterAlpha);
+            _pitchAccFilter = new DoubleFilterMAexpDecaying(filterAlpha);
+            _rollAccFilter = new DoubleFilterMAexpDecaying(filterAlpha);
 
-            // Inizializzazione dei calcolatori di velocità basati sui timestamp
-            _yawVelocityCalculator = new VelocityCalculatorTimestamped(maxSamples, maxSampleAgeMs);
-            _pitchVelocityCalculator = new VelocityCalculatorTimestamped(maxSamples, maxSampleAgeMs);
-            _rollVelocityCalculator = new VelocityCalculatorTimestamped(maxSamples, maxSampleAgeMs);
+            // Initialize timestamp-based acceleration calculators (reusing VelocityCalculator for derivative)
+            _yawAccelerationCalculator = new VelocityCalculatorTimestamped(maxSamples, maxSampleAgeMs);
+            _pitchAccelerationCalculator = new VelocityCalculatorTimestamped(maxSamples, maxSampleAgeMs);
+            _rollAccelerationCalculator = new VelocityCalculatorTimestamped(maxSamples, maxSampleAgeMs);
         }
 
         /// <summary>
-        /// Applica le trasformazioni ai dati. Questo metodo verrà tipicamente chiamato dal <see cref="NithModule"/>.
+        /// Applies transformations to the data. This method will typically be called by the <see cref="NithModule"/>.
         /// </summary>
-        /// <param name="sensorData">Dati provenienti dal sensore NITH.</param>
-        /// <returns>I dati trasformati.</returns>
+        /// <param name="sensorData">Data from the NITH sensor.</param>
+        /// <returns>The transformed data.</returns>
         public NithSensorData TransformData(NithSensorData sensorData)
         {
-            // Calcola le velocità se sono disponibili i dati di posizione della testa ma non già i dati di velocità
-            if ((sensorData.ContainsParameter(NithParameters.head_pos_yaw) ||
-                sensorData.ContainsParameter(NithParameters.head_pos_pitch) ||
-                sensorData.ContainsParameter(NithParameters.head_pos_roll)) &&
-                (!sensorData.ContainsParameter(NithParameters.head_vel_yaw) ||
-                !sensorData.ContainsParameter(NithParameters.head_vel_pitch) ||
-                !sensorData.ContainsParameter(NithParameters.head_vel_roll)))
+            // Calculate accelerations if head velocity data is available but acceleration data is not
+            if ((sensorData.ContainsParameter(NithParameters.head_vel_yaw) ||
+                sensorData.ContainsParameter(NithParameters.head_vel_pitch) ||
+                sensorData.ContainsParameter(NithParameters.head_vel_roll)) &&
+                (!sensorData.ContainsParameter(NithParameters.head_acc_yaw) ||
+                !sensorData.ContainsParameter(NithParameters.head_acc_pitch) ||
+                !sensorData.ContainsParameter(NithParameters.head_acc_roll)))
             {
-                // Usa lo stesso timestamp per tutti i calcoli di questa chiamata
+                // Use the same timestamp for all calculations in this call
                 DateTime currentTime = DateTime.Now;
 
-                // Calcola le velocità per ciascun asse se è disponibile il dato di posizione
-                if (sensorData.ContainsParameter(NithParameters.head_pos_yaw) &&
-                    !sensorData.ContainsParameter(NithParameters.head_vel_yaw))
+                // Calculate accelerations for each axis if velocity data is available
+                if (sensorData.ContainsParameter(NithParameters.head_vel_yaw) &&
+                    !sensorData.ContainsParameter(NithParameters.head_acc_yaw))
                 {
-                    double yawPos = sensorData.GetParameterValue(NithParameters.head_pos_yaw).Value.ValueAsDouble;
+                    double yawVel = sensorData.GetParameterValue(NithParameters.head_vel_yaw).Value.ValueAsDouble;
 
-                    // Calcola velocità usando il timestamp attuale
-                    float yawVelocity = _yawVelocityCalculator.Push((float)yawPos, currentTime);
+                    // Calculate acceleration using current timestamp (derivative of velocity)
+                    float yawAcceleration = _yawAccelerationCalculator.Push((float)yawVel, currentTime);
 
-                    // Filtra la velocità per ridurre il rumore
-                    _yawVelFilter.Push(yawVelocity * _velocitySensitivity);
-                    double filteredYawVel = _yawVelFilter.Pull();
+                    // Filter acceleration to reduce noise
+                    _yawAccFilter.Push(yawAcceleration * _accelerationSensitivity);
+                    double filteredYawAcc = _yawAccFilter.Pull();
 
-                    // Aggiungi il valore di velocità calcolato
+                    // Add the calculated acceleration value
                     sensorData.Values.Add(new()
                     {
                         DataType = NithDataTypes.OnlyValue,
-                        Parameter = NithParameters.head_vel_yaw,
-                        Value = filteredYawVel.ToString(VelocityNumberFormat, CultureInfo.InvariantCulture),
+                        Parameter = NithParameters.head_acc_yaw,
+                        Value = filteredYawAcc.ToString(AccelerationNumberFormat, CultureInfo.InvariantCulture),
                     });
 
-                    // Salva la posizione attuale per il prossimo calcolo
-                    _lastYawPos = yawPos;
+                    // Save current velocity for next calculation
+                    _lastYawVel = yawVel;
                 }
 
-                if (sensorData.ContainsParameter(NithParameters.head_pos_pitch) &&
-                    !sensorData.ContainsParameter(NithParameters.head_vel_pitch))
+                if (sensorData.ContainsParameter(NithParameters.head_vel_pitch) &&
+                    !sensorData.ContainsParameter(NithParameters.head_acc_pitch))
                 {
-                    double pitchPos = sensorData.GetParameterValue(NithParameters.head_pos_pitch).Value.ValueAsDouble;
+                    double pitchVel = sensorData.GetParameterValue(NithParameters.head_vel_pitch).Value.ValueAsDouble;
 
-                    // Calcola velocità usando il timestamp attuale
-                    float pitchVelocity = _pitchVelocityCalculator.Push((float)pitchPos, currentTime);
+                    // Calculate acceleration using current timestamp
+                    float pitchAcceleration = _pitchAccelerationCalculator.Push((float)pitchVel, currentTime);
 
-                    // Filtra la velocità per ridurre il rumore
-                    _pitchVelFilter.Push(pitchVelocity * _velocitySensitivity);
-                    double filteredPitchVel = _pitchVelFilter.Pull();
+                    // Filter acceleration to reduce noise
+                    _pitchAccFilter.Push(pitchAcceleration * _accelerationSensitivity);
+                    double filteredPitchAcc = _pitchAccFilter.Pull();
 
-                    // Aggiungi il valore di velocità calcolato
+                    // Add the calculated acceleration value
                     sensorData.Values.Add(new()
                     {
                         DataType = NithDataTypes.OnlyValue,
-                        Parameter = NithParameters.head_vel_pitch,
-                        Value = filteredPitchVel.ToString(VelocityNumberFormat, CultureInfo.InvariantCulture),
+                        Parameter = NithParameters.head_acc_pitch,
+                        Value = filteredPitchAcc.ToString(AccelerationNumberFormat, CultureInfo.InvariantCulture),
                     });
 
-                    // Salva la posizione attuale per il prossimo calcolo
-                    _lastPitchPos = pitchPos;
+                    // Save current velocity for next calculation
+                    _lastPitchVel = pitchVel;
                 }
 
-                if (sensorData.ContainsParameter(NithParameters.head_pos_roll) &&
-                    !sensorData.ContainsParameter(NithParameters.head_vel_roll))
+                if (sensorData.ContainsParameter(NithParameters.head_vel_roll) &&
+                    !sensorData.ContainsParameter(NithParameters.head_acc_roll))
                 {
-                    double rollPos = sensorData.GetParameterValue(NithParameters.head_pos_roll).Value.ValueAsDouble;
+                    double rollVel = sensorData.GetParameterValue(NithParameters.head_vel_roll).Value.ValueAsDouble;
 
-                    // Calcola velocità usando il timestamp attuale
-                    float rollVelocity = _rollVelocityCalculator.Push((float)rollPos, currentTime);
+                    // Calculate acceleration using current timestamp
+                    float rollAcceleration = _rollAccelerationCalculator.Push((float)rollVel, currentTime);
 
-                    // Filtra la velocità per ridurre il rumore
-                    _rollVelFilter.Push(rollVelocity * _velocitySensitivity);
-                    double filteredRollVel = _rollVelFilter.Pull();
+                    // Filter acceleration to reduce noise
+                    _rollAccFilter.Push(rollAcceleration * _accelerationSensitivity);
+                    double filteredRollAcc = _rollAccFilter.Pull();
 
-                    // Aggiungi il valore di velocità calcolato
+                    // Add the calculated acceleration value
                     sensorData.Values.Add(new()
                     {
                         DataType = NithDataTypes.OnlyValue,
-                        Parameter = NithParameters.head_vel_roll,
-                        Value = filteredRollVel.ToString(VelocityNumberFormat, CultureInfo.InvariantCulture),
+                        Parameter = NithParameters.head_acc_roll,
+                        Value = filteredRollAcc.ToString(AccelerationNumberFormat, CultureInfo.InvariantCulture),
                     });
 
-                    // Salva la posizione attuale per il prossimo calcolo
-                    _lastRollPos = rollPos;
+                    // Save current velocity for next calculation
+                    _lastRollVel = rollVel;
                 }
             }
 

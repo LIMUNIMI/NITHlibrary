@@ -1,4 +1,5 @@
-﻿using System.IO.Ports;
+﻿using System.Diagnostics;
+using System.IO.Ports;
 using System.Timers;
 using Timer = System.Timers.Timer;
 
@@ -18,6 +19,9 @@ namespace NITHlibrary.Tools.Ports
         private readonly SerialPort _serialPort;
         private int _port = 1;
         private readonly Timer _timeoutTimer;
+        private long _lastSampleTicks = 0;
+        private long _minTicksBetweenSamples = 0;
+        private int _droppedSamplesCount = 0;
 
         /// <summary>
         /// Initializes an instance of the <see cref="USBreceiver"/> class with specified baudRate and disconnectTimeout.
@@ -37,6 +41,8 @@ namespace NITHlibrary.Tools.Ports
             _serialPort.ReadTimeout = 500;
             _serialPort.WriteTimeout = 500;
             _serialPort.DataReceived += new(DataReceivedHandler);
+
+            MaxSamplesPerSecond = 100; // Default rate limit
         }
 
         /// <summary>
@@ -73,6 +79,40 @@ namespace NITHlibrary.Tools.Ports
         public bool ReadError { get; protected set; } = false;
 
         /// <summary>
+        /// Gets or sets the maximum number of samples per second to process.
+        /// Set to 0 for unlimited (no rate limiting).
+        /// Default is 100 samples/second.
+        /// </summary>
+        public int MaxSamplesPerSecond
+        {
+            get => _minTicksBetweenSamples == 0 ? 0 : (int)(Stopwatch.Frequency / _minTicksBetweenSamples);
+            set
+            {
+                if (value <= 0)
+                {
+                    _minTicksBetweenSamples = 0; // Unlimited
+                }
+                else
+                {
+                    _minTicksBetweenSamples = Stopwatch.Frequency / value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the total number of samples dropped due to rate limiting since connection.
+        /// </summary>
+        public int DroppedSamplesCount => _droppedSamplesCount;
+
+        /// <summary>
+        /// Resets the dropped samples counter.
+        /// </summary>
+        public void ResetDroppedSamplesCount()
+        {
+            _droppedSamplesCount = 0;
+        }
+
+        /// <summary>
         /// Connects to the specified port.
         /// </summary>
         /// <param name="port">The port number to connect to.</param>
@@ -107,6 +147,8 @@ namespace NITHlibrary.Tools.Ports
             }
 
             IsConnected = true;
+            _lastSampleTicks = 0;
+            _droppedSamplesCount = 0;
             return true;
         }
 
@@ -185,6 +227,22 @@ namespace NITHlibrary.Tools.Ports
         /// <param name="line">The line of data received from the serial port.</param>
         private void TransferDataToListeners(string line)
         {
+            // Rate limiting: check if enough time has passed since last sample
+            if (_minTicksBetweenSamples > 0)
+            {
+                long currentTicks = Stopwatch.GetTimestamp();
+                long ticksSinceLastSample = currentTicks - _lastSampleTicks;
+
+                if (_lastSampleTicks != 0 && ticksSinceLastSample < _minTicksBetweenSamples)
+                {
+                    // Drop this sample - too fast
+                    _droppedSamplesCount++;
+                    return;
+                }
+
+                _lastSampleTicks = currentTicks;
+            }
+
             foreach (var listener in Listeners)
             {
                 listener.ReceivePortData(line);
